@@ -1,0 +1,1491 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Reef Desk — Unified Excursion Bookings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Onest:wght@300..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root {
+  --bg: #F4F1EA;
+  --bg-2: #ECE7DC;
+  --ink: #1A2025;
+  --ink-2: #3B4147;
+  --muted: #8B8678;
+  --muted-2: #A6A192;
+  --primary: #1B4965;
+  --primary-ink: #0E2A3B;
+  --accent: #E07856;
+  --accent-soft: #F4D4C5;
+  --good: #4A7C59;
+  --warn: #C9842B;
+  --bad: #B23A48;
+  --card: #FFFFFE;
+  --border: #DDD7C8;
+  --border-2: #E8E2D2;
+  --shadow: 0 1px 0 rgba(26,32,37,.04), 0 8px 24px -16px rgba(26,32,37,.18);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Onest', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(1200px 600px at 110% -10%, rgba(27,73,101,.06), transparent 60%),
+    radial-gradient(800px 500px at -10% 110%, rgba(224,120,86,.05), transparent 60%);
+}
+h1, h2, h3, .display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 500;
+  font-variation-settings: "opsz" 36;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+.mono, code, kbd, .num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+/* ===== Top bar ===== */
+header {
+position: sticky; top: 0; z-index: 50;
+background: rgba(244,241,234,.85);
+backdrop-filter: saturate(140%) blur(12px);
+-webkit-backdrop-filter: saturate(140%) blur(12px);
+border-bottom: 1px solid var(–border);
+}
+.bar { display: flex; align-items: center; gap: 16px; padding: 14px 28px; max-width: 1600px; margin: 0 auto; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .logo {
+width: 32px; height: 32px; border-radius: 8px;
+background: linear-gradient(140deg, var(–primary), #0d3147 70%);
+position: relative; flex-shrink: 0;
+}
+.brand .logo::after {
+content: “”; position: absolute; inset: 7px;
+border: 1.5px solid rgba(255,255,255,.7); border-radius: 4px;
+border-bottom: none; border-right: none;
+transform: rotate(-30deg);
+}
+.brand .name { font-family: ‘Fraunces’, serif; font-size: 22px; font-weight: 500; letter-spacing: -.015em; line-height: 1; }
+.brand .name em { font-style: italic; color: var(–primary); font-weight: 400; }
+.brand .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(–muted); margin-left: 4px; }
+.spacer { flex: 1; }
+
+button, .btn {
+font-family: inherit; font-size: 13px; font-weight: 500;
+padding: 8px 14px; border-radius: 8px; border: 1px solid var(–border);
+background: var(–card); color: var(–ink); cursor: pointer;
+display: inline-flex; align-items: center; gap: 8px;
+transition: all .15s ease;
+line-height: 1.2;
+}
+button:hover, .btn:hover { border-color: var(–ink-2); transform: translateY(-1px); }
+button:active, .btn:active { transform: translateY(0); }
+.btn-primary { background: var(–primary); color: white; border-color: var(–primary); }
+.btn-primary:hover { background: var(–primary-ink); border-color: var(–primary-ink); }
+.btn-accent { background: var(–accent); color: white; border-color: var(–accent); }
+.btn-accent:hover { background: #c95e3f; border-color: #c95e3f; }
+.btn-ghost { background: transparent; border-color: transparent; color: var(–ink-2); }
+.btn-ghost:hover { background: rgba(26,32,37,.05); border-color: transparent; }
+.btn-danger { color: var(–bad); border-color: var(–border); }
+.btn-danger:hover { background: var(–bad); color: white; border-color: var(–bad); }
+button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
+
+.status-pill {
+font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+padding: 4px 10px; border-radius: 999px; border: 1px solid var(–border);
+display: inline-flex; align-items: center; gap: 6px; color: var(–muted);
+background: rgba(255,255,255,.5);
+}
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(–muted-2); }
+.status-pill.is-loaded { color: var(–good); border-color: rgba(74,124,89,.3); }
+.status-pill.is-loaded .dot { background: var(–good); }
+.status-pill.is-dirty { color: var(–warn); border-color: rgba(201,132,43,.3); }
+.status-pill.is-dirty .dot { background: var(–warn); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+/* ===== Layout ===== */
+main { max-width: 1600px; margin: 0 auto; padding: 24px 28px 80px; }
+
+/* Empty state */
+.welcome { display: grid; place-items: center; min-height: 70vh; text-align: center; }
+.welcome-card {
+max-width: 580px; padding: 48px 40px;
+background: var(–card); border: 1px solid var(–border); border-radius: 16px;
+box-shadow: var(–shadow);
+position: relative; overflow: hidden;
+}
+.welcome-card::before {
+content: “”; position: absolute; inset: 0; pointer-events: none;
+background: radial-gradient(400px 200px at 50% -20%, rgba(27,73,101,.08), transparent);
+}
+.welcome h1 { font-size: 38px; line-height: 1.05; margin-bottom: 12px; }
+.welcome h1 em { font-style: italic; color: var(–primary); font-weight: 400; }
+.welcome p { color: var(–ink-2); font-size: 15px; margin: 0 0 28px; }
+.welcome-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.welcome-actions .btn { padding: 12px 18px; font-size: 14px; }
+.welcome small { display: block; margin-top: 22px; font-size: 12px; color: var(–muted); }
+
+/* ===== Filters bar ===== */
+.filters {
+display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+padding: 16px 18px; background: var(–card); border: 1px solid var(–border);
+border-radius: 12px; margin-bottom: 18px; box-shadow: var(–shadow);
+}
+.filter-label { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(–muted); margin-right: 4px; }
+input[type=“text”], input[type=“number”], input[type=“date”], select, textarea {
+font-family: inherit; font-size: 13px;
+padding: 7px 10px; border-radius: 7px;
+border: 1px solid var(–border); background: var(–card);
+color: var(–ink); outline: none;
+transition: border-color .15s ease, box-shadow .15s ease;
+}
+input:focus, select:focus, textarea:focus {
+border-color: var(–primary);
+box-shadow: 0 0 0 3px rgba(27,73,101,.12);
+}
+.search-input { width: 260px; padding-left: 32px; background-image: url(“data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238B8678' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/></svg>”); background-repeat: no-repeat; background-position: 10px center; }
+
+.tabs {
+display: inline-flex; gap: 2px; background: var(–bg-2);
+padding: 3px; border-radius: 9px; border: 1px solid var(–border);
+}
+.tab {
+font-size: 12px; padding: 6px 12px; border-radius: 6px;
+cursor: pointer; color: var(–ink-2); transition: all .15s;
+background: transparent; border: none; font-family: inherit; font-weight: 500;
+}
+.tab:hover { color: var(–ink); }
+.tab.active { background: var(–card); color: var(–ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+/* ===== Stats strip ===== */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stat {
+background: var(–card); border: 1px solid var(–border); border-radius: 10px;
+padding: 14px 16px; box-shadow: var(–shadow);
+}
+.stat .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(–muted); }
+.stat .val { font-family: ‘Fraunces’, serif; font-size: 28px; line-height: 1; margin-top: 6px; font-weight: 500; }
+.stat .sub { font-size: 11px; color: var(–muted); margin-top: 4px; }
+
+/* ===== Bookings table ===== */
+.table-wrap {
+background: var(–card); border: 1px solid var(–border); border-radius: 12px;
+overflow: hidden; box-shadow: var(–shadow);
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+font-size: 10px; text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
+color: var(–muted); padding: 12px 14px; text-align: left;
+border-bottom: 1px solid var(–border); background: var(–bg-2);
+white-space: nowrap;
+}
+thead th.num-col { text-align: right; }
+tbody td { padding: 11px 14px; border-bottom: 1px solid var(–border-2); vertical-align: top; }
+tbody tr { transition: background .12s; cursor: pointer; }
+tbody tr:hover { background: rgba(27,73,101,.04); }
+tbody tr:last-child td { border-bottom: none; }
+tbody td.num { text-align: right; }
+tbody .guest { font-weight: 500; color: var(–ink); }
+tbody .room { font-family: ‘JetBrains Mono’, monospace; font-size: 12px; color: var(–ink-2); }
+tbody .excursion {
+display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+padding: 3px 8px; border-radius: 5px;
+background: var(–bg-2); color: var(–ink-2);
+border: 1px solid var(–border);
+}
+tbody .excursion .swatch { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+tbody .date { font-family: ‘JetBrains Mono’, monospace; color: var(–ink-2); font-size: 12px; }
+tbody .date strong { font-family: ‘Fraunces’, serif; font-size: 15px; color: var(–ink); display: block; line-height: 1; font-weight: 500; }
+tbody .date small { color: var(–muted); font-size: 11px; }
+tbody .pax { font-family: ‘JetBrains Mono’, monospace; }
+tbody .remarks-cell { color: var(–muted); font-size: 12px; max-width: 200px; }
+
+.empty-row td { text-align: center; padding: 60px 20px; color: var(–muted); font-style: italic; }
+.empty-row .display { font-size: 22px; color: var(–ink-2); margin-bottom: 6px; font-style: normal; }
+
+/* ===== Day view ===== */
+.day-grid { display: grid; gap: 18px; }
+.day-card {
+background: var(–card); border: 1px solid var(–border); border-radius: 12px;
+overflow: hidden; box-shadow: var(–shadow);
+}
+.day-card-head {
+padding: 14px 18px; border-bottom: 1px solid var(–border);
+display: flex; align-items: baseline; gap: 16px; background: var(–bg-2);
+flex-wrap: wrap;
+}
+.day-card-head h3 { font-size: 18px; font-weight: 500; }
+.day-card-head h3 em { font-style: italic; color: var(–primary); }
+.day-card-head .meta { font-size: 12px; color: var(–muted); }
+.day-card-head .pill {
+margin-left: auto;
+font-size: 11px; padding: 3px 9px; border-radius: 999px;
+background: var(–card); border: 1px solid var(–border);
+color: var(–ink-2); font-family: ‘JetBrains Mono’, monospace;
+}
+.day-card-head .pill.full { background: var(–accent-soft); color: var(–bad); border-color: rgba(178,58,72,.25); }
+.day-card-head .pill.warn { background: #FBE9CC; color: var(–warn); border-color: rgba(201,132,43,.3); }
+
+.day-card .add-row {
+display: flex; align-items: center; justify-content: space-between;
+padding: 10px 18px; border-top: 1px dashed var(–border);
+font-size: 12px; color: var(–muted); background: rgba(244,241,234,.5);
+}
+.day-card .add-row .add-btn { font-size: 12px; padding: 6px 11px; }
+
+/* ===== Modal ===== */
+.modal-bg {
+position: fixed; inset: 0; z-index: 100;
+background: rgba(26,32,37,.5);
+display: flex; align-items: center; justify-content: center;
+padding: 24px;
+animation: fadein .15s ease;
+}
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+background: var(–card); border-radius: 14px; max-width: 580px; width: 100%;
+max-height: 92vh; overflow-y: auto;
+box-shadow: 0 30px 80px -20px rgba(0,0,0,.4);
+animation: pop .2s cubic-bezier(.2,.8,.2,1.1);
+}
+@keyframes pop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal h2 { font-size: 22px; padding: 22px 26px 8px; line-height: 1.15; }
+.modal h2 em { font-style: italic; color: var(–primary); }
+.modal .sub { padding: 0 26px 18px; color: var(–muted); font-size: 13px; }
+.modal .body { padding: 0 26px 8px; }
+.modal .foot {
+padding: 16px 26px 22px; display: flex; gap: 10px; justify-content: flex-end;
+border-top: 1px solid var(–border-2); margin-top: 8px;
+}
+
+.field { margin-bottom: 14px; }
+.field label {
+display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+color: var(–muted); margin-bottom: 5px; font-weight: 600;
+}
+.field input, .field select, .field textarea { width: 100%; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field-help { font-size: 11px; color: var(–muted); margin-top: 4px; }
+
+.toast {
+position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+background: var(–ink); color: white; padding: 12px 18px; border-radius: 10px;
+font-size: 13px; z-index: 200; box-shadow: 0 12px 30px rgba(0,0,0,.25);
+animation: toastin .2s cubic-bezier(.2,.8,.2,1.1);
+display: flex; align-items: center; gap: 10px;
+}
+.toast.is-error { background: var(–bad); }
+.toast.is-success { background: var(–good); }
+@keyframes toastin { from { transform: translate(-50%, 8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+.icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* Guest history detail */
+.guest-detail {
+background: var(–card); border: 1px solid var(–border); border-radius: 12px;
+padding: 22px; margin-bottom: 18px; box-shadow: var(–shadow);
+}
+.guest-detail .name { font-size: 24px; font-family: ‘Fraunces’, serif; font-weight: 500; }
+.guest-detail .room { font-family: ‘JetBrains Mono’, monospace; color: var(–muted); font-size: 13px; margin-top: 4px; }
+.guest-detail .booklist { margin-top: 16px; display: grid; gap: 8px; }
+.guest-detail .booklist .b {
+padding: 10px 14px; border: 1px solid var(–border-2); border-radius: 8px;
+display: flex; align-items: center; gap: 14px; cursor: pointer;
+transition: all .15s;
+}
+.guest-detail .booklist .b:hover { border-color: var(–primary); background: rgba(27,73,101,.03); }
+.guest-detail .booklist .b .swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.guest-detail .booklist .b .when { font-family: ‘JetBrains Mono’, monospace; font-size: 12px; color: var(–ink-2); }
+.guest-detail .booklist .b .what { font-weight: 500; flex: 1; }
+.guest-detail .booklist .b .who { font-size: 12px; color: var(–muted); }
+
+@media (max-width: 800px) {
+.bar { padding: 10px 16px; flex-wrap: wrap; }
+main { padding: 16px; }
+.search-input { width: 100%; }
+.field-row, .field-row-3 { grid-template-columns: 1fr; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(–border); border-radius: 10px; border: 2px solid var(–bg); }
+::-webkit-scrollbar-thumb:hover { background: var(–muted-2); }
+</style>
+
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="name">Reef <em>Desk</em></div>
+      <span class="tag">Excursion bookings</span>
+    </div>
+    <div class="spacer"></div>
+    <div id="status-area" style="display:none; gap: 8px; align-items:center;">
+      <span id="status-pill" class="status-pill is-loaded"><span class="dot"></span><span id="status-text">Ready</span></span>
+      <button id="btn-reload" class="btn btn-ghost" title="Reload from disk">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        Reload
+      </button>
+      <button id="btn-save" class="btn btn-primary" disabled>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save changes
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="app">
+  <section class="welcome" id="welcome">
+    <div class="welcome-card">
+      <h1>One <em>desk</em>.<br>Every excursion booking.</h1>
+      <p>Open the shared folder containing your monthly booking sheets — Reef Desk parses every excursion and date into a single searchable view. Add, edit, or cancel bookings, and write changes back to the original Excel files.</p>
+      <div class="welcome-actions">
+        <button id="btn-open-folder" class="btn btn-primary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Open shared folder
+        </button>
+        <button id="btn-open-files" class="btn">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          Pick files manually
+        </button>
+      </div>
+      <small>Files never leave your browser. Folder access requires Chrome, Edge, or another Chromium browser opened directly (not in an embed).</small>
+    </div>
+  </section>
+
+  <section id="workspace" style="display:none;">
+    <div class="filters">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-view="day">By day</button>
+        <button class="tab" data-view="all">All bookings</button>
+        <button class="tab" data-view="guest">Guest history</button>
+      </div>
+      <span class="filter-label">From</span>
+      <input type="date" id="filter-from" />
+      <span class="filter-label">to</span>
+      <input type="date" id="filter-to" />
+      <select id="filter-excursion">
+        <option value="">All excursions</option>
+      </select>
+      <input id="search" type="text" class="search-input" placeholder="Search guest, room, or remark…" />
+      <div class="spacer" style="flex:1"></div>
+      <button id="btn-add" class="btn btn-accent">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        New booking
+      </button>
+    </div>
+
+```
+<div class="stats" id="stats"></div>
+<div id="view-container"></div>
+```
+
+  </section>
+</main>
+
+<div id="modal-mount"></div>
+<div id="toast-mount"></div>
+
+<input type="file" id="file-input" multiple accept=".xlsx" style="display:none;" />
+
+<script>
+/* ============================================================
+   Reef Desk — unified booking interface (ExcelJS edition)
+   - Reads folder of excursion .xlsx files
+   - Auto-detects layout per sheet (header row, columns, capacity)
+   - Unified day / table / guest views
+   - Add / edit / cancel bookings → writes back preserving formatting
+   ============================================================ */
+
+const STATE = {
+  mode: 'fs',
+  dirHandle: null,
+  files: [],     // {name, fileHandle?, fileObj?, wb (ExcelJS), dirty, sheets:[{sheetName, ws (ExcelJS), layout}]}
+  bookings: [],
+  excursions: [],
+  view: 'day',
+  filters: { from: '', to: '', excursion: '', q: '' },
+};
+
+const PALETTE = ['#1B4965','#E07856','#4A7C59','#A65A47','#6A4E7C','#3D6975','#C9842B','#8B5E3C','#2E7D6F','#7A4A6E'];
+function colorFor(idx){ return PALETTE[idx % PALETTE.length]; }
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+function el(tag, attrs={}, ...children){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (k === 'class') e.className = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    e.append(c.nodeType ? c : document.createTextNode(c));
+  }
+  return e;
+}
+function toast(msg, kind=''){
+  const t = el('div', {class: 'toast ' + (kind === 'error' ? 'is-error' : kind === 'success' ? 'is-success' : '')}, msg);
+  $('#toast-mount').append(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .2s'; }, 2400);
+  setTimeout(()=> t.remove(), 2700);
+}
+
+/* ============================================================
+   Date helpers
+   ============================================================ */
+function pad2(n){ return String(n).padStart(2,'0'); }
+function isoFromParts(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
+function parseDateValue(v) {
+  if (v == null) return null;
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return null;
+    return isoFromParts(v.getFullYear(), v.getMonth()+1, v.getDate());
+  }
+  if (typeof v === 'object' && v.result instanceof Date) return parseDateValue(v.result);
+  if (typeof v === 'object' && typeof v.result === 'string') return parseDateValue(v.result);
+  if (typeof v === 'object' && v.text) return parseDateValue(v.text);
+  if (typeof v === 'number') {
+    if (v > 25569) {
+      const ms = (v - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      return isoFromParts(d.getFullYear(), d.getMonth()+1, d.getDate());
+    }
+  }
+  if (typeof v === 'string') {
+    const s = v.trim();
+    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return isoFromParts(+m[3], +m[2], +m[1]);
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) return isoFromParts(+m[1], +m[2], +m[3]);
+  }
+  return null;
+}
+function fmtDate(iso){
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  return dt.toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
+}
+function fmtDateLong(iso){
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  return dt.toLocaleDateString(undefined, {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+}
+function todayISO(){ const t = new Date(); return isoFromParts(t.getFullYear(), t.getMonth()+1, t.getDate()); }
+
+/* ============================================================
+   Cell value extraction (ExcelJS gives us mixed shapes)
+   ============================================================ */
+function cellRaw(cell) {
+  if (!cell) return null;
+  const v = cell.value;
+  if (v == null) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v !== 'object') return v;
+  // formula cell: { formula, result }
+  if ('result' in v) {
+    if (v.result == null) return null;
+    if (v.result instanceof Date && isNaN(v.result.getTime())) return null;
+    if (typeof v.result === 'object' && 'error' in v.result) return null;
+    return v.result;
+  }
+  // rich text
+  if (v.richText) return v.richText.map(t => t.text).join('');
+  if (v.text) return v.text; // hyperlink-style
+  if (v.error) return null;
+  return null;
+}
+function cellStr(cell) {
+  const v = cellRaw(cell);
+  if (v == null) return '';
+  if (v instanceof Date) return v.toISOString();
+  return String(v).trim();
+}
+function cellNum(cell) {
+  const v = cellRaw(cell);
+  if (v == null) return null;
+  if (typeof v === 'string' && v.trim() === '') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+/* ============================================================
+   Layout detection (per sheet)
+   - Build a row-of-rows snapshot for rows 1..20 to find header row and title
+   - Then return the rows we need (header, first/last booking, totals, layout)
+   ============================================================ */
+const HEADER_KEYS = {
+  room:      [/^room/i, /^cabin/i],
+  guest:     [/guest\s*name/i, /^name$/i],
+  departure: [/^departure/i, /check.?out/i],
+  adults:    [/^adults?$/i, /^pax$/i],
+  child:     [/^child(ren)?$/i, /^kids?$/i],
+  liability: [/^liability/i],
+  billNo:    [/^bill\s*no/i, /^bill$/i, /^folio/i, /^check/i],
+  remarks:   [/^remarks?/i, /^notes?/i, /comment/i],
+  staff:     [/^staff/i, /^crew/i, /^guide/i],
+};
+function classifyHeader(text) {
+  if (!text) return null;
+  const t = String(text).trim();
+  for (const [key, patterns] of Object.entries(HEADER_KEYS)) {
+    for (const p of patterns) if (p.test(t)) return key;
+  }
+  return null;
+}
+
+// Snapshot rows 1..maxRow (1-indexed) from an ExcelJS worksheet into 1-indexed AOA.
+// Each row entry is { 1: val, 2: val, ... } (column-keyed) plus an array form for iteration.
+function snapshotRows(ws, maxRow = 25) {
+  const out = []; // out[r] = array of cells (1-indexed: out[r][1..N])
+  out[0] = [];
+  for (let r = 1; r <= maxRow; r++) {
+    const row = ws.getRow(r);
+    const cells = [null]; // index 0 unused
+    const colCount = Math.max(row.cellCount, ws.actualColumnCount || 0, 12);
+    for (let c = 1; c <= colCount; c++) {
+      cells[c] = cellRaw(row.getCell(c));
+    }
+    out[r] = cells;
+  }
+  return out;
+}
+
+function detectLayout(ws) {
+  const rows = snapshotRows(ws, Math.min(ws.actualRowCount || 30, 30));
+
+  // 1. Find header row (must have Room and Guest Name)
+  let headerRow = -1, layout = null;
+  for (let r = 1; r <= Math.min(rows.length-1, 20); r++) {
+    const cells = rows[r] || [];
+    let hasRoom = false, hasGuest = false;
+    const map = {};
+    for (let c = 1; c < cells.length; c++) {
+      const k = classifyHeader(cells[c]);
+      if (k) { map[k] = c; }
+      if (k === 'room') hasRoom = true;
+      if (k === 'guest') hasGuest = true;
+    }
+    if (hasRoom && hasGuest) { headerRow = r; layout = map; break; }
+  }
+  if (headerRow < 0) return null;
+
+  // 2. Title
+  let title = '';
+  for (let r = Math.max(1, headerRow - 6); r < headerRow; r++) {
+    const cells = rows[r] || [];
+    for (let c = 1; c < cells.length; c++) {
+      const v = cells[c];
+      if (typeof v === 'string' && v.length > 5 && /[A-Z]/.test(v)
+          && !/note\s*:/i.test(v) && !/^\s*date/i.test(v)) {
+        if (/MAX\s*\d+\s*(PAX|PER)/i.test(v) || /USD\$/i.test(v)
+            || /excursion|dolphin|fishing|snorkel|island|night|reef|orientation|cruise/i.test(v)) {
+          title = v; break;
+        }
+      }
+    }
+    if (title) break;
+  }
+  if (!title) {
+    outer: for (let r = 1; r < headerRow; r++) {
+      const cells = rows[r] || [];
+      for (let c = 1; c < cells.length; c++) {
+        const v = cells[c];
+        if (typeof v === 'string' && v.length > 8 && !/note/i.test(v) && !/^\s*date/i.test(v)) { title = v; break outer; }
+      }
+    }
+  }
+
+  // 3. Capacity
+  let capacity = null;
+  if (title) {
+    const m = title.match(/MAX\s*0?(\d+)\s*(PAX|PER|PERSON)/i);
+    if (m) capacity = +m[1];
+  }
+
+  // 4. Date — search rows for "Date:" label, take adjacent cell to its right.
+  //    Some files store the date as a CONCATENATE formula that uses CELL("filename")
+  //    to derive the day from the sheet name and joins it to a "/MM/YYYY" literal.
+  //    We support: plain values, formula cached results, and the CONCATENATE pattern.
+  let dateISO = null;
+  for (let r = 1; r <= Math.min(rows.length-1, 20); r++) {
+    const cells = rows[r] || [];
+    for (let c = 1; c < cells.length; c++) {
+      const v = cells[c];
+      if (typeof v === 'string' && /^\s*date\s*:?\s*$/i.test(v)) {
+        for (let cc = c + 1; cc < cells.length; cc++) {
+          const adjCell = ws.getRow(r).getCell(cc);
+          const rawVal = adjCell.value;
+          // (a) cached formula result, or plain value via cellRaw
+          const fromCell = cellRaw(adjCell);
+          let iso = parseDateValue(fromCell);
+          // (b) formula with "/MM/YYYY" literal + sheet-name day
+          if (!iso && rawVal && typeof rawVal === 'object' && rawVal.formula) {
+            const m = String(rawVal.formula).match(/"\/(\d{1,2})\/(\d{4})"/);
+            if (m) {
+              const day = parseInt(String(ws.name).replace(/^0/, ''), 10);
+              if (!isNaN(day) && day >= 1 && day <= 31) iso = isoFromParts(+m[2], +m[1], day);
+            }
+          }
+          // (c) plain string snapshot
+          if (!iso) iso = parseDateValue(cells[cc]);
+          if (iso) { dateISO = iso; break; }
+        }
+      }
+      if (dateISO) break;
+    }
+    if (dateISO) break;
+  }
+  // (d) last resort: if sheet name looks like a day-of-month, infer from the first
+  //     successfully-parsed date in any other cell on this sheet
+  if (!dateISO) {
+    const day = parseInt(String(ws.name).replace(/^0/, ''), 10);
+    if (!isNaN(day) && day >= 1 && day <= 31) {
+      // scan all formulas for a /MM/YYYY literal
+      for (let r = 1; r <= Math.min(rows.length-1, 10); r++) {
+        for (let c = 1; c < (rows[r]||[]).length; c++) {
+          const cell = ws.getRow(r).getCell(c);
+          const v = cell.value;
+          if (v && typeof v === 'object' && v.formula) {
+            const m = String(v.formula).match(/"\/(\d{1,2})\/(\d{4})"/);
+            if (m) { dateISO = isoFromParts(+m[2], +m[1], day); break; }
+          }
+        }
+        if (dateISO) break;
+      }
+    }
+  }
+
+  // 5. Booking range — from headerRow+1 down to TOTAL row or "General Policies"
+  const firstBooking = headerRow + 1;
+  let lastBooking = firstBooking;
+  let totalRow = -1;
+  // We need to keep scanning beyond the snapshot — re-fetch as needed
+  const limit = Math.max(60, ws.actualRowCount || 60);
+  for (let r = firstBooking; r <= limit; r++) {
+    const row = ws.getRow(r);
+    const cells = [];
+    const colCount = Math.max(row.cellCount, 12);
+    for (let c = 1; c <= colCount; c++) cells.push(cellRaw(row.getCell(c)));
+    const hasTotal = cells.some(v => typeof v === 'string' && /^\s*total\s*$/i.test(v));
+    if (hasTotal) { totalRow = r; break; }
+    const policyHit = cells.some(v => typeof v === 'string' && /general\s+policies/i.test(v));
+    if (policyHit) { totalRow = r; break; }
+    lastBooking = r;
+  }
+  if (totalRow > 0) lastBooking = totalRow - 1;
+  if (!capacity) capacity = lastBooking - firstBooking + 1;
+
+  let excursionName = (title || 'Excursion').split(/\(MAX|USD\$|MAX\s*\d/i)[0].trim();
+  excursionName = excursionName.replace(/\s+/g,' ').trim();
+
+  return { headerRow, firstBooking, lastBooking, layout, capacity, dateISO, title, excursionName };
+}
+
+/* ============================================================
+   Read a booking row → flat record
+   ============================================================ */
+function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, dateISO, capacity, excursionColor) {
+  const row = ws.getRow(rowIdx);
+  const at = (cIdx) => cIdx == null ? null : row.getCell(cIdx);
+
+  const slot = cellRaw(row.getCell(1));
+  const room = cellStr(at(layout.layout.room));
+  const guest = cellStr(at(layout.layout.guest));
+  const departureRaw = cellRaw(at(layout.layout.departure));
+  const departure = parseDateValue(departureRaw);
+  const adults = cellNum(at(layout.layout.adults));
+  const child = cellNum(at(layout.layout.child));
+  const liability = cellStr(at(layout.layout.liability));
+  const billNo = cellStr(at(layout.layout.billNo));
+  const remarks = cellStr(at(layout.layout.remarks));
+  const staff = cellStr(at(layout.layout.staff));
+
+  const isEmpty = !room && !guest && adults == null && child == null
+    && !liability && !billNo && !remarks && !staff && !departureRaw;
+
+  return {
+    id: `${fileKey}::${sheetName}::${rowIdx}`,
+    fileKey, sheetName, rowIdx,
+    excursionName, excursionColor, capacity, dateISO,
+    slot,
+    room, guest, departure, departureRaw,
+    adults, child, liability, billNo, remarks, staff,
+    isEmpty,
+  };
+}
+
+/* ============================================================
+   Loading workbooks
+   ============================================================ */
+async function loadFiles(fileSpecs){
+  STATE.files = [];
+  STATE.bookings = [];
+  STATE.excursions = [];
+
+  for (const spec of fileSpecs) {
+    try {
+      const buf = await spec.getBytes();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf.buffer ? buf.buffer : buf);
+      const sheets = [];
+      wb.eachSheet((ws, id) => {
+        const lay = detectLayout(ws);
+        if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
+      });
+      STATE.files.push({
+        name: spec.name,
+        fileHandle: spec.fileHandle || null,
+        fileObj: spec.fileObj || null,
+        wb, sheets, dirty: false,
+      });
+    } catch (err) {
+      console.error('load failed', spec.name, err);
+      toast(`Couldn't read ${spec.name}: ${err.message}`, 'error');
+    }
+  }
+
+  // Build excursions list
+  const excSeen = new Map();
+  STATE.files.forEach((f) => {
+    const exName = f.sheets[0]?.layout.excursionName || f.name.replace(/\.xlsx$/i,'');
+    if (!excSeen.has(exName)) excSeen.set(exName, { name: exName, color: colorFor(excSeen.size), files: [f.name] });
+    else excSeen.get(exName).files.push(f.name);
+    f.excursionName = exName;
+    f.excursionColor = excSeen.get(exName).color;
+  });
+  STATE.excursions = Array.from(excSeen.values());
+
+  rebuildBookings();
+}
+
+function rebuildBookings(){
+  const out = [];
+  for (const f of STATE.files) {
+    for (const s of f.sheets) {
+      const lay = s.layout;
+      for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
+        const b = readBooking(s.ws, s.sheetName, f.name, lay, r, f.excursionName, lay.dateISO, lay.capacity, f.excursionColor);
+        if (!b.isEmpty) out.push(b);
+      }
+    }
+  }
+  STATE.bookings = out;
+}
+
+/* ============================================================
+   Writing back
+   ============================================================ */
+function writeBooking(fileEntry, sheetName, rowIdx, fields) {
+  const sheetEntry = fileEntry.sheets.find(s => s.sheetName === sheetName);
+  if (!sheetEntry) return false;
+  const ws = sheetEntry.ws;
+  const layout = sheetEntry.layout.layout;
+
+  function setCell(c, value) {
+    if (c == null) return;
+    const cell = ws.getRow(rowIdx).getCell(c);
+    if (value == null || value === '') {
+      cell.value = null;
+    } else {
+      cell.value = value;
+    }
+  }
+
+  setCell(layout.room, fields.room);
+  setCell(layout.guest, fields.guest);
+  setCell(layout.departure, fields.departure ? toDeparture(fields.departure) : null);
+  setCell(layout.adults, fields.adults === '' || fields.adults == null ? null : Number(fields.adults));
+  setCell(layout.child, fields.child === '' || fields.child == null ? null : Number(fields.child));
+  setCell(layout.liability, fields.liability);
+  setCell(layout.billNo, fields.billNo);
+  setCell(layout.remarks, fields.remarks);
+  setCell(layout.staff, fields.staff);
+
+  fileEntry.dirty = true;
+  rebuildBookings();
+  updateStatus();
+  return true;
+}
+function clearBooking(fileEntry, sheetName, rowIdx) {
+  return writeBooking(fileEntry, sheetName, rowIdx, {
+    room: null, guest: null, departure: null, adults: null, child: null,
+    liability: null, billNo: null, remarks: null, staff: null,
+  });
+}
+function toDeparture(s) {
+  if (!s) return null;
+  const iso = parseDateValue(s);
+  if (iso) {
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  return s;
+}
+
+/* ============================================================
+   Saving
+   ============================================================ */
+async function saveAll() {
+  const dirtyFiles = STATE.files.filter(f => f.dirty);
+  if (!dirtyFiles.length) { toast('Nothing to save'); return; }
+
+  let saved = 0;
+  for (const f of dirtyFiles) {
+    try {
+      const buf = await f.wb.xlsx.writeBuffer();
+      if (STATE.mode === 'fs' && f.fileHandle) {
+        const w = await f.fileHandle.createWritable();
+        await w.write(buf);
+        await w.close();
+      } else {
+        const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = f.name; a.click();
+        URL.revokeObjectURL(url);
+      }
+      f.dirty = false;
+      saved++;
+    } catch (err) {
+      console.error(err);
+      toast(`Failed to save ${f.name}: ${err.message}`, 'error');
+    }
+  }
+  if (saved) toast(`Saved ${saved} file${saved>1?'s':''}`, 'success');
+  updateStatus();
+}
+
+async function reload() {
+  if (STATE.mode === 'fs' && STATE.dirHandle) {
+    if (STATE.files.some(f=>f.dirty)) {
+      if (!confirm('You have unsaved changes. Reload anyway?')) return;
+    }
+    await openDirectory(STATE.dirHandle);
+    toast('Reloaded from disk');
+  } else {
+    toast('Reload only works with shared-folder mode');
+  }
+}
+
+/* ============================================================
+   File System Access API + manual fallback
+   ============================================================ */
+async function openDirectory(handle) {
+  STATE.dirHandle = handle;
+  STATE.mode = 'fs';
+  const specs = [];
+  for await (const [name, h] of handle.entries()) {
+    if (h.kind === 'file' && /\.xlsx$/i.test(name) && !/^~\$/.test(name)) {
+      specs.push({
+        name,
+        fileHandle: h,
+        getBytes: async () => new Uint8Array(await (await h.getFile()).arrayBuffer()),
+      });
+    }
+  }
+  if (!specs.length) { toast('No .xlsx files in that folder', 'error'); return; }
+  toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
+  await loadFiles(specs);
+  showWorkspace();
+}
+async function pickDirectory() {
+  if (!('showDirectoryPicker' in window)) {
+    toast('Your browser doesn\'t support folder access — use "Pick files" instead.', 'error');
+    return;
+  }
+  try {
+    const h = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const perm = await h.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      const req = await h.requestPermission({ mode: 'readwrite' });
+      if (req !== 'granted') { toast('Write permission denied', 'error'); return; }
+    }
+    await openDirectory(h);
+  } catch (e) {
+    if (e.name !== 'AbortError') { console.error(e); toast(e.message, 'error'); }
+  }
+}
+function pickFiles() {
+  const inp = $('#file-input');
+  inp.value = '';
+  inp.onchange = async () => {
+    const files = Array.from(inp.files || []);
+    if (!files.length) return;
+    STATE.mode = 'fp';
+    const specs = files.map(f => ({
+      name: f.name,
+      fileObj: f,
+      getBytes: async () => new Uint8Array(await f.arrayBuffer()),
+    }));
+    toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
+    await loadFiles(specs);
+    showWorkspace();
+  };
+  inp.click();
+}
+
+/* ============================================================
+   Workspace render
+   ============================================================ */
+function showWorkspace(){
+  $('#welcome').style.display = 'none';
+  $('#workspace').style.display = '';
+  $('#status-area').style.display = 'flex';
+
+  const sel = $('#filter-excursion');
+  sel.innerHTML = '<option value="">All excursions</option>';
+  STATE.excursions.forEach(e => sel.append(el('option', { value: e.name }, e.name)));
+
+  // Default filter: bookings on or after today
+  const t = todayISO();
+  // If all data is in the past (test data), drop the floor so something shows
+  const minDate = STATE.files.flatMap(f => f.sheets).map(s => s.layout.dateISO).filter(Boolean).sort();
+  const fromDefault = (minDate.length && minDate[minDate.length-1] < t) ? minDate[0] : t;
+  $('#filter-from').value = fromDefault;
+  $('#filter-to').value = '';
+  STATE.filters.from = fromDefault;
+  STATE.filters.to = '';
+
+  updateStatus();
+  renderStats();
+  renderView();
+}
+
+function updateStatus(){
+  const dirty = STATE.files.some(f=>f.dirty);
+  const pill = $('#status-pill'), txt = $('#status-text');
+  pill.classList.toggle('is-dirty', dirty);
+  pill.classList.toggle('is-loaded', !dirty);
+  if (dirty) {
+    const n = STATE.files.filter(f=>f.dirty).length;
+    txt.textContent = `${n} unsaved`;
+  } else {
+    txt.textContent = `${STATE.files.length} file${STATE.files.length>1?'s':''} loaded`;
+  }
+  $('#btn-save').disabled = !dirty;
+}
+
+function getFilteredBookings(){
+  const { from, to, excursion, q } = STATE.filters;
+  const ql = (q||'').toLowerCase().trim();
+  return STATE.bookings.filter(b => {
+    if (from && b.dateISO && b.dateISO < from) return false;
+    if (to && b.dateISO && b.dateISO > to) return false;
+    if (excursion && b.excursionName !== excursion) return false;
+    if (ql) {
+      const hay = [b.guest, b.room, b.remarks, b.staff, b.billNo, b.liability].join(' ').toLowerCase();
+      if (!hay.includes(ql)) return false;
+    }
+    return true;
+  });
+}
+
+function renderStats(){
+  const list = getFilteredBookings();
+  const totalPax = list.reduce((s,b)=> s + (b.adults||0) + (b.child||0), 0);
+  const dates = new Set(list.map(b=>b.dateISO).filter(Boolean));
+  const guests = new Set(list.map(b=>b.guest.toUpperCase()).filter(Boolean));
+
+  const t = todayISO();
+  const today = STATE.bookings.filter(b=>b.dateISO === t);
+  const todayPax = today.reduce((s,b)=> s + (b.adults||0) + (b.child||0), 0);
+
+  let totalSlots = 0, totalUsed = 0;
+  for (const f of STATE.files) for (const s of f.sheets) {
+    if (!s.layout.dateISO) continue;
+    if (STATE.filters.from && s.layout.dateISO < STATE.filters.from) continue;
+    if (STATE.filters.to && s.layout.dateISO > STATE.filters.to) continue;
+    totalSlots += s.layout.capacity || 0;
+    const sBookings = STATE.bookings.filter(b => b.fileKey === f.name && b.sheetName === s.sheetName);
+    totalUsed += sBookings.reduce((sm,b)=> sm + (b.adults||0) + (b.child||0), 0);
+  }
+  const util = totalSlots ? Math.round((totalUsed/totalSlots)*100) : 0;
+
+  $('#stats').replaceChildren(
+    statCard('In view', list.length, `${dates.size} day${dates.size===1?'':'s'} · ${guests.size} guests`),
+    statCard('Pax in view', totalPax, `${list.reduce((s,b)=>s+(b.adults||0),0)} adults · ${list.reduce((s,b)=>s+(b.child||0),0)} child`),
+    statCard('Today', today.length, `${todayPax} pax across ${new Set(today.map(b=>b.excursionName)).size} excursions`),
+    statCard('Capacity used', util + '%', `${totalUsed} of ${totalSlots} slots filled`),
+  );
+}
+function statCard(lbl, val, sub){
+  return el('div', {class:'stat'},
+    el('div', {class:'lbl'}, lbl),
+    el('div', {class:'val num'}, String(val)),
+    el('div', {class:'sub'}, sub || ''),
+  );
+}
+
+function renderView() {
+  const c = $('#view-container');
+  c.innerHTML = '';
+  if (STATE.view === 'all') c.append(renderAllTable());
+  else if (STATE.view === 'day') c.append(renderDayView());
+  else if (STATE.view === 'guest') c.append(renderGuestView());
+}
+
+function renderAllTable() {
+  const wrap = el('div', {class:'table-wrap'});
+  const list = getFilteredBookings();
+  list.sort((a,b) => (a.dateISO||'').localeCompare(b.dateISO||'') || a.excursionName.localeCompare(b.excursionName) || (a.slot||0)-(b.slot||0));
+
+  const head = el('thead', {},
+    el('tr', {},
+      el('th', {}, 'Date'),
+      el('th', {}, 'Excursion'),
+      el('th', {}, 'Room'),
+      el('th', {}, 'Guest'),
+      el('th', {class:'num-col'}, 'Pax'),
+      el('th', {}, 'Bill'),
+      el('th', {}, 'Liab.'),
+      el('th', {}, 'Remarks'),
+      el('th', {}, 'Staff'),
+    )
+  );
+
+  const body = el('tbody', {});
+  if (!list.length) {
+    body.append(el('tr', {class:'empty-row'}, el('td', {colspan: 9},
+      el('div', {class:'display'}, 'No bookings match'),
+      el('div', {}, 'Try adjusting filters or clearing the search.')
+    )));
+  } else {
+    for (const b of list) {
+      const tr = el('tr', { onclick: () => openEditModal(b) },
+        el('td', {class:'date'},
+          el('strong', {}, fmtDate(b.dateISO).split(',')[1]?.trim() || fmtDate(b.dateISO)),
+          el('small', {}, fmtDate(b.dateISO).split(',')[0])
+        ),
+        el('td', {},
+          el('span', {class:'excursion'},
+            el('span', {class:'swatch', style:`background:${b.excursionColor}`}),
+            b.excursionName
+          )
+        ),
+        el('td', {class:'room'}, b.room || '—'),
+        el('td', {class:'guest'}, b.guest || '—'),
+        el('td', {class:'num pax'}, `${b.adults||0}+${b.child||0}`),
+        el('td', {class:'mono', style:'font-size:11px;color:var(--muted)'}, b.billNo || ''),
+        el('td', {class:'mono', style:'font-size:11px;color:var(--muted)'}, b.liability || ''),
+        el('td', {class:'remarks-cell'}, b.remarks || ''),
+        el('td', {style:'font-size:12px;color:var(--ink-2)'}, b.staff || ''),
+      );
+      body.append(tr);
+    }
+  }
+
+  const tbl = el('table', {}, head, body);
+  wrap.append(tbl);
+  return wrap;
+}
+
+function renderDayView() {
+  const byDate = new Map();
+  for (const b of STATE.bookings) {
+    if (!b.dateISO) continue;
+    if (STATE.filters.from && b.dateISO < STATE.filters.from) continue;
+    if (STATE.filters.to && b.dateISO > STATE.filters.to) continue;
+    if (STATE.filters.excursion && b.excursionName !== STATE.filters.excursion) continue;
+    if (!byDate.has(b.dateISO)) byDate.set(b.dateISO, new Map());
+    const ex = byDate.get(b.dateISO);
+    if (!ex.has(b.excursionName)) ex.set(b.excursionName, []);
+    ex.get(b.excursionName).push(b);
+  }
+  // Include empty days (so user can add to empty days)
+  for (const f of STATE.files) {
+    for (const s of f.sheets) {
+      if (!s.layout.dateISO) continue;
+      const d = s.layout.dateISO;
+      if (STATE.filters.from && d < STATE.filters.from) continue;
+      if (STATE.filters.to && d > STATE.filters.to) continue;
+      if (STATE.filters.excursion && f.excursionName !== STATE.filters.excursion) continue;
+      if (!byDate.has(d)) byDate.set(d, new Map());
+      const ex = byDate.get(d);
+      if (!ex.has(f.excursionName)) ex.set(f.excursionName, []);
+    }
+  }
+  // search filter
+  if (STATE.filters.q) {
+    const ql = STATE.filters.q.toLowerCase().trim();
+    for (const d of [...byDate.keys()]) {
+      const ex = byDate.get(d);
+      let any = false;
+      for (const arr of ex.values()) if (arr.some(b => [b.guest,b.room,b.remarks,b.staff,b.billNo].join(' ').toLowerCase().includes(ql))) { any = true; break; }
+      if (!any) byDate.delete(d);
+    }
+  }
+
+  const grid = el('div', {class:'day-grid'});
+  if (byDate.size === 0) {
+    grid.append(el('div', {class:'empty-row', style:'padding:48px 20px;text-align:center;color:var(--muted)'},
+      el('div', {class:'display', style:'font-size:22px;color:var(--ink-2);margin-bottom:6px'}, 'No bookings in this range'),
+      el('div', {}, 'Adjust the date range or clear filters to see more.')
+    ));
+    return grid;
+  }
+  for (const d of Array.from(byDate.keys()).sort()) {
+    const exMap = byDate.get(d);
+    for (const [exName, bookings] of Array.from(exMap.entries()).sort()) {
+      const file = STATE.files.find(f => f.excursionName === exName);
+      if (!file) continue;
+      const sheetEntry = file.sheets.find(s => s.layout.dateISO === d);
+      if (!sheetEntry) continue;
+      const cap = sheetEntry.layout.capacity;
+      const filled = bookings.reduce((s,b)=>s+(b.adults||0)+(b.child||0), 0);
+      const remaining = Math.max(0, cap - filled);
+      const status = remaining === 0 ? 'full' : remaining <= cap*0.2 ? 'warn' : '';
+      const card = el('div', {class:'day-card'});
+
+      const swatch = el('span', { style:`display:inline-block;width:9px;height:9px;border-radius:50%;background:${file.excursionColor};margin-right:8px;vertical-align:middle` });
+
+      const head = el('div', {class:'day-card-head'},
+        el('h3', {}, swatch, exName, ' ', el('em', {}, fmtDate(d))),
+        el('div', {class:'meta'}, sheetEntry.layout.title || ''),
+        el('div', {class:'pill ' + status}, `${filled} / ${cap} pax · ${remaining} left`),
+      );
+
+      const tbl = el('table', {});
+      tbl.append(el('thead', {},
+        el('tr', {},
+          el('th', {style:'width:40px'}, '#'),
+          el('th', {}, 'Room'),
+          el('th', {}, 'Guest'),
+          el('th', {class:'num-col'}, 'Pax'),
+          el('th', {}, 'Bill'),
+          el('th', {}, 'Liab.'),
+          el('th', {}, 'Remarks'),
+          el('th', {}, 'Staff'),
+        )
+      ));
+      const body = el('tbody');
+      const sorted = [...bookings].sort((a,b)=>(a.slot||0)-(b.slot||0));
+      if (!sorted.length) {
+        body.append(el('tr', {class:'empty-row'}, el('td', {colspan:8}, 'No bookings yet — click "Add" below to make the first one.')));
+      } else {
+        for (const b of sorted) {
+          const tr = el('tr', { onclick: ()=> openEditModal(b) },
+            el('td', {class:'mono', style:'color:var(--muted)'}, b.slot || ''),
+            el('td', {class:'room'}, b.room || ''),
+            el('td', {class:'guest'}, b.guest || ''),
+            el('td', {class:'num pax'}, `${b.adults||0}+${b.child||0}`),
+            el('td', {class:'mono', style:'font-size:11px;color:var(--muted)'}, b.billNo || ''),
+            el('td', {class:'mono', style:'font-size:11px;color:var(--muted)'}, b.liability || ''),
+            el('td', {class:'remarks-cell'}, b.remarks || ''),
+            el('td', {style:'font-size:12px;color:var(--ink-2)'}, b.staff || ''),
+          );
+          body.append(tr);
+        }
+      }
+      tbl.append(body);
+      card.append(head, tbl);
+
+      card.append(el('div', {class:'add-row'},
+        el('span', {}, `Tap any row to edit, cancel, or move it`),
+        el('button', {class:'btn add-btn', onclick:(e)=>{ e.stopPropagation(); openAddModal({excursionName:exName, dateISO:d}); }},
+          el('span', {html:'＋'}), 'Add booking'
+        )
+      ));
+
+      grid.append(card);
+    }
+  }
+  return grid;
+}
+
+function renderGuestView() {
+  const byGuest = new Map();
+  for (const b of STATE.bookings) {
+    const k = (b.guest || '').toUpperCase().trim();
+    if (!k) continue;
+    if (!byGuest.has(k)) byGuest.set(k, []);
+    byGuest.get(k).push(b);
+  }
+  const ql = (STATE.filters.q||'').toLowerCase().trim();
+  let entries = Array.from(byGuest.entries());
+  if (ql) entries = entries.filter(([k, bs]) => k.toLowerCase().includes(ql) || bs.some(b => [b.room,b.billNo,b.remarks].join(' ').toLowerCase().includes(ql)));
+  entries.sort((a,b)=> b[1].length - a[1].length || a[0].localeCompare(b[0]));
+
+  const wrap = el('div');
+  if (!entries.length) {
+    wrap.append(el('div', {class:'guest-detail', style:'text-align:center;color:var(--muted)'},
+      el('div', {class:'name', style:'color:var(--ink-2)'}, 'No guests found'),
+      el('div', {style:'margin-top:8px'}, 'Search by name, room, or bill number.')
+    ));
+    return wrap;
+  }
+  for (const [name, list] of entries.slice(0, 60)) {
+    list.sort((a,b)=>(a.dateISO||'').localeCompare(b.dateISO||''));
+    const rooms = Array.from(new Set(list.map(b=>b.room).filter(Boolean))).join(' · ');
+    const card = el('div', {class:'guest-detail'},
+      el('div', {style:'display:flex;align-items:baseline;gap:14px;flex-wrap:wrap'},
+        el('div', {class:'name'}, name),
+        el('div', {class:'room'}, rooms),
+        el('div', {style:'margin-left:auto;font-size:12px;color:var(--muted)'}, `${list.length} booking${list.length>1?'s':''}`),
+      ),
+      el('div', {class:'booklist'},
+        ...list.map(b => el('div', {class:'b', onclick: ()=>openEditModal(b)},
+          el('span', {class:'swatch', style:`background:${b.excursionColor}`}),
+          el('div', {class:'when'}, fmtDate(b.dateISO)),
+          el('div', {class:'what'}, b.excursionName),
+          el('div', {class:'who'}, `${(b.adults||0)+(b.child||0)} pax · ${b.staff||'—'}`),
+        ))
+      )
+    );
+    wrap.append(card);
+  }
+  if (entries.length > 60) {
+    wrap.append(el('div', {style:'text-align:center;color:var(--muted);padding:14px;font-size:12px'},
+      `Showing 60 of ${entries.length} guests — narrow the search to see more.`
+    ));
+  }
+  return wrap;
+}
+
+/* ============================================================
+   Modals
+   ============================================================ */
+function openModal(node){
+  const mount = $('#modal-mount');
+  mount.innerHTML = '';
+  const bg = el('div', {class:'modal-bg', onclick: (e)=>{ if (e.target === bg) closeModal(); }},
+    el('div', {class:'modal'}, node)
+  );
+  mount.append(bg);
+  setTimeout(()=>{ const i = bg.querySelector('input,select,textarea'); if (i) i.focus(); }, 30);
+}
+function closeModal(){ $('#modal-mount').innerHTML = ''; }
+
+function openAddModal(prefill = {}) {
+  const slots = [];
+  for (const f of STATE.files) {
+    for (const s of f.sheets) {
+      if (!s.layout.dateISO) continue;
+      const filled = STATE.bookings.filter(b => b.fileKey === f.name && b.sheetName === s.sheetName)
+        .reduce((sm,b)=> sm + (b.adults||0) + (b.child||0), 0);
+      slots.push({
+        fileKey: f.name, sheetName: s.sheetName,
+        excursionName: f.excursionName, color: f.excursionColor,
+        dateISO: s.layout.dateISO, capacity: s.layout.capacity,
+        filled, remaining: s.layout.capacity - filled,
+      });
+    }
+  }
+  slots.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||'') || a.excursionName.localeCompare(b.excursionName));
+
+  let pickedExcursion = prefill.excursionName || '';
+  let pickedDate = prefill.dateISO || '';
+
+  const slotInfo = el('div', {class:'field-help', style:'min-height:18px'});
+  function updateSlotInfo() {
+    const m = slots.find(s => s.excursionName === pickedExcursion && s.dateISO === pickedDate);
+    if (!m) { slotInfo.textContent = pickedExcursion && pickedDate ? 'No sheet exists for this date — pick another.' : ''; return; }
+    if (m.remaining <= 0) slotInfo.innerHTML = `<span style="color:var(--bad)">⚠ Excursion is FULL (${m.filled}/${m.capacity}). Booking will overbook.</span>`;
+    else slotInfo.innerHTML = `<span style="color:var(--good)">${m.remaining} of ${m.capacity} slots free.</span>`;
+  }
+
+  const exSel = el('select', { onchange: (e)=>{ pickedExcursion = e.target.value; rebuildDateSelect(); updateSlotInfo(); } },
+    el('option', {value:''}, 'Choose excursion…'),
+    ...STATE.excursions.map(e => el('option', { value: e.name, ...(e.name === pickedExcursion ? {selected:''} : {}) }, e.name))
+  );
+  const dateSel = el('select', { onchange: (e)=>{ pickedDate = e.target.value; updateSlotInfo(); } });
+  function rebuildDateSelect() {
+    dateSel.innerHTML = '';
+    dateSel.append(el('option', {value:''}, 'Choose date…'));
+    const ds = slots.filter(s => !pickedExcursion || s.excursionName === pickedExcursion);
+    const seenDates = new Set();
+    for (const s of ds) {
+      if (seenDates.has(s.dateISO)) continue;
+      seenDates.add(s.dateISO);
+      const lbl = `${fmtDate(s.dateISO)} — ${s.remaining}/${s.capacity} free`;
+      dateSel.append(el('option', { value: s.dateISO, ...(s.dateISO===pickedDate ? {selected:''}:{}) }, lbl));
+    }
+  }
+  rebuildDateSelect();
+
+  const room = el('input', {type:'text', placeholder:'e.g. 105 or Prebooking'});
+  const guest = el('input', {type:'text', placeholder:'GUEST FULL NAME'});
+  const departure = el('input', {type:'date'});
+  const adults = el('input', {type:'number', min:'0', placeholder:'2', value:'2'});
+  const child = el('input', {type:'number', min:'0', placeholder:'0', value:''});
+  const billNo = el('input', {type:'text', placeholder:'optional'});
+  const liability = el('input', {type:'text', placeholder:'optional'});
+  const remarks = el('input', {type:'text', placeholder:'optional'});
+  const staff = el('input', {type:'text', placeholder:'optional'});
+
+  const submit = ()=>{
+    if (!pickedExcursion || !pickedDate) { toast('Pick excursion and date', 'error'); return; }
+    if (!guest.value.trim()) { toast('Guest name required', 'error'); return; }
+    const slot = slots.find(s => s.excursionName === pickedExcursion && s.dateISO === pickedDate);
+    if (!slot) { toast('No sheet for that date', 'error'); return; }
+    const file = STATE.files.find(f => f.name === slot.fileKey);
+    const sheetEntry = file.sheets.find(s => s.sheetName === slot.sheetName);
+    const lay = sheetEntry.layout;
+    let targetRow = -1;
+    for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
+      const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, file.name, lay, r, file.excursionName, lay.dateISO, lay.capacity, file.excursionColor);
+      if (b.isEmpty) { targetRow = r; break; }
+    }
+    if (targetRow < 0) {
+      if (!confirm('All numbered slots on the sheet are taken. Continue anyway and overwrite the last slot?')) return;
+      targetRow = lay.lastBooking;
+    }
+    writeBooking(file, sheetEntry.sheetName, targetRow, {
+      room: room.value.trim(), guest: guest.value.trim(),
+      departure: departure.value, adults: adults.value, child: child.value || 0,
+      liability: liability.value.trim(), billNo: billNo.value.trim(),
+      remarks: remarks.value.trim(), staff: staff.value.trim(),
+    });
+    toast('Booking added', 'success');
+    closeModal();
+    renderStats(); renderView();
+  };
+
+  const node = el('div', {},
+    el('h2', {}, 'New ', el('em', {}, 'booking')),
+    el('div', {class:'sub'}, 'Reef Desk will write to the next free slot on that day\'s sheet. The original Excel formatting is preserved.'),
+    el('div', {class:'body'},
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Excursion'), exSel),
+        el('div', {class:'field'}, el('label', {}, 'Date'), dateSel),
+      ),
+      slotInfo,
+      el('div', {class:'field-row', style:'margin-top:14px'},
+        el('div', {class:'field'}, el('label', {}, 'Room'), room),
+        el('div', {class:'field'}, el('label', {}, 'Guest name'), guest),
+      ),
+      el('div', {class:'field-row-3'},
+        el('div', {class:'field'}, el('label', {}, 'Adults'), adults),
+        el('div', {class:'field'}, el('label', {}, 'Child'), child),
+        el('div', {class:'field'}, el('label', {}, 'Departure'), departure),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Bill no.'), billNo),
+        el('div', {class:'field'}, el('label', {}, 'Liability'), liability),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Staff'), staff),
+        el('div', {class:'field'}, el('label', {}, 'Remarks'), remarks),
+      ),
+    ),
+    el('div', {class:'foot'},
+      el('button', {class:'btn btn-ghost', onclick:closeModal}, 'Cancel'),
+      el('button', {class:'btn btn-primary', onclick:submit}, 'Add booking'),
+    )
+  );
+  openModal(node);
+  updateSlotInfo();
+}
+
+function openEditModal(b) {
+  const file = STATE.files.find(f => f.name === b.fileKey);
+
+  const room = el('input', {type:'text', value: b.room || ''});
+  const guest = el('input', {type:'text', value: b.guest || ''});
+  const departure = el('input', {type:'date', value: b.departure || ''});
+  const adults = el('input', {type:'number', min:'0', value: b.adults ?? ''});
+  const child = el('input', {type:'number', min:'0', value: b.child ?? ''});
+  const billNo = el('input', {type:'text', value: b.billNo || ''});
+  const liability = el('input', {type:'text', value: b.liability || ''});
+  const remarks = el('input', {type:'text', value: b.remarks || ''});
+  const staff = el('input', {type:'text', value: b.staff || ''});
+
+  const save = ()=>{
+    writeBooking(file, b.sheetName, b.rowIdx, {
+      room: room.value.trim(), guest: guest.value.trim(),
+      departure: departure.value, adults: adults.value, child: child.value || 0,
+      liability: liability.value.trim(), billNo: billNo.value.trim(),
+      remarks: remarks.value.trim(), staff: staff.value.trim(),
+    });
+    toast('Booking updated', 'success');
+    closeModal(); renderStats(); renderView();
+  };
+  const cancel = ()=>{
+    if (!confirm(`Cancel ${b.guest}'s booking on ${fmtDate(b.dateISO)} (${b.excursionName})?`)) return;
+    clearBooking(file, b.sheetName, b.rowIdx);
+    toast('Booking cancelled', 'success');
+    closeModal(); renderStats(); renderView();
+  };
+
+  const node = el('div', {},
+    el('h2', {}, 'Edit ', el('em', {}, 'booking')),
+    el('div', {class:'sub'}, `${b.excursionName} · ${fmtDateLong(b.dateISO)} · slot ${b.slot ?? '?'}`),
+    el('div', {class:'body'},
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Room'), room),
+        el('div', {class:'field'}, el('label', {}, 'Guest name'), guest),
+      ),
+      el('div', {class:'field-row-3'},
+        el('div', {class:'field'}, el('label', {}, 'Adults'), adults),
+        el('div', {class:'field'}, el('label', {}, 'Child'), child),
+        el('div', {class:'field'}, el('label', {}, 'Departure'), departure),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Bill no.'), billNo),
+        el('div', {class:'field'}, el('label', {}, 'Liability'), liability),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Staff'), staff),
+        el('div', {class:'field'}, el('label', {}, 'Remarks'), remarks),
+      ),
+    ),
+    el('div', {class:'foot'},
+      el('button', {class:'btn btn-danger', onclick:cancel}, 'Cancel booking'),
+      el('div', {class:'spacer', style:'flex:1'}),
+      el('button', {class:'btn btn-ghost', onclick:closeModal}, 'Close'),
+      el('button', {class:'btn btn-primary', onclick:save}, 'Save'),
+    )
+  );
+  openModal(node);
+}
+
+/* ============================================================
+   Wire-up
+   ============================================================ */
+$('#btn-open-folder').addEventListener('click', pickDirectory);
+$('#btn-open-files').addEventListener('click', pickFiles);
+$('#btn-add').addEventListener('click', () => openAddModal());
+$('#btn-save').addEventListener('click', saveAll);
+$('#btn-reload').addEventListener('click', reload);
+
+$$('.tab').forEach(btn => btn.addEventListener('click', ()=>{
+  $$('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  STATE.view = btn.dataset.view;
+  renderView();
+}));
+$('#filter-from').addEventListener('change', e=>{ STATE.filters.from = e.target.value; renderStats(); renderView(); });
+$('#filter-to').addEventListener('change', e=>{ STATE.filters.to = e.target.value; renderStats(); renderView(); });
+$('#filter-excursion').addEventListener('change', e=>{ STATE.filters.excursion = e.target.value; renderStats(); renderView(); });
+$('#search').addEventListener('input', e=>{ STATE.filters.q = e.target.value; renderStats(); renderView(); });
+
+window.addEventListener('keydown', e=>{
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveAll(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); if (STATE.files.length) openAddModal(); }
+  if (e.key === 'Escape') closeModal();
+});
+window.addEventListener('beforeunload', e=>{
+  if (STATE.files.some(f=>f.dirty)) { e.preventDefault(); e.returnValue = ''; }
+});
+
+if (!('showDirectoryPicker' in window)) {
+  $('#btn-open-folder').style.display = 'none';
+}
+</script>
+
+</body>
+</html>
