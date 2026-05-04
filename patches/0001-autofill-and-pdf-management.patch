@@ -1,0 +1,294 @@
+From 015e3975ecb589bdd1e6a74f139f52c5f7f467d9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 4 May 2026 05:14:04 +0000
+Subject: [PATCH] Autofill guest details from room number; clearer PDF
+ management UI
+
+- lookupInhouse now falls back to the most recent record for a room when
+  no booking date is picked or the date is outside the guest's stay,
+  instead of returning no match. Stale-data and out-of-range cases are
+  surfaced in the autofill status hint.
+- tryAutofill runs as soon as a room number is entered (date no longer
+  required) and clears any previously autofilled values when the room
+  is cleared or has no PDF record, so unmatched fields stay blank.
+- Inhouse modal now shows a "Loaded PDFs" section header with file
+  count, a Clear-all action, and a labelled Remove button per row. An
+  Add PDFs button is always visible in the modal footer.
+---
+ Booking engine v3.3 (offline).html | 171 +++++++++++++++++++++--------
+ 1 file changed, 127 insertions(+), 44 deletions(-)
+
+diff --git a/Booking engine v3.3 (offline).html b/Booking engine v3.3 (offline).html
+index a44ad6e..f4825ca 100644
+--- a/Booking engine v3.3 (offline).html	
++++ b/Booking engine v3.3 (offline).html	
+@@ -823,7 +823,27 @@ display: block;
+ .upload-zone strong { font-weight: 600; color: var(--ink); display: block; font-size: 14px; }
+ .upload-zone small { color: var(--muted); font-size: 12px; display: block; margin-top: 4px; }
+ 
+-.report-list { margin-top: 16px; }
++.report-list { margin-top: 8px; }
++.report-list-header {
++display: flex; align-items: center; gap: 10px;
++margin: 16px 0 6px;
++padding: 4px 2px;
++border-bottom: 1px solid var(--border-2);
++padding-bottom: 6px;
++}
++.report-list-title { font-weight: 600; font-size: 13px; color: var(--ink); }
++.report-list-count {
++font-size: 11px; color: var(--muted);
++font-family: 'JetBrains Mono', monospace;
++flex: 1;
++}
++.btn-link-danger {
++background: transparent; border: none;
++color: var(--bad); cursor: pointer;
++font-size: 12px; font-weight: 500;
++padding: 4px 8px; border-radius: 4px;
++}
++.btn-link-danger:hover { background: var(--bad-soft); }
+ .report-row {
+ display: grid;
+ grid-template-columns: 60px 1fr auto auto;
+@@ -842,13 +862,21 @@ padding: 3px 6px; border-radius: 4px;
+ background: var(--primary-soft); color: var(--primary-ink);
+ text-align: center;
+ }
+-.report-row .name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
++.report-row .name {
++color: var(--ink); font-weight: 500;
++overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
++min-width: 0;
++}
+ .report-row .meta { color: var(--muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+ .report-row .remove {
+-color: var(--muted); cursor: pointer;
+-padding: 4px 6px; border-radius: 4px;
+-border: none; background: transparent;
++display: inline-flex; align-items: center; gap: 4px;
++color: var(--bad); cursor: pointer;
++padding: 5px 9px; border-radius: 6px;
++border: 1px solid var(--bad);
++background: transparent;
++font-size: 12px; font-weight: 500;
+ }
++.report-row .remove .icon { width: 14px; height: 14px; }
+ .report-row .remove:hover { background: var(--bad); color: white; }
+ .<report-row.is>-failed { background: var(--bad-soft); border-color: var(--bad); }
+ .<report-row.is>-failed .property { background: rgba(168, 49, 63, .18); color: var(--bad); }
+@@ -1983,7 +2011,13 @@ function openAddModal(prefill = {}) {
+     inhouseStatus.textContent = '';
+     inhouseStatus.classList.remove('is-good', 'is-warn', 'is-info');
+     const r = room.value.trim();
+-    if (!r || !pickedDate) return;
++    if (!r) {
++      // Room cleared — drop any values we previously filled in
++      if (autofilled.guest) { guest.value = ''; autofilled.guest = false; }
++      if (autofilled.departure) { departure.value = ''; autofilled.departure = false; }
++      return;
++    }
++    // Lookup runs as soon as a room is typed — date is optional.
+     const result = lookupInhouse(r, pickedDate);
+     if (result.match) {
+       const m = result.match;
+@@ -1994,23 +2028,30 @@ function openAddModal(prefill = {}) {
+       if (m.departure && (!departure.value || autofilled.departure)) {
+         departure.value = m.departure; autofilled.departure = true;
+       }
++      // If the matched record has neither name nor departure, clear any prior
++      // autofilled values so the form ends up blank rather than carrying
++      // stale data from a previous lookup.
++      if (!m.name && autofilled.guest) { guest.value = ''; autofilled.guest = false; }
++      if (!m.departure && autofilled.departure) { departure.value = ''; autofilled.departure = false; }
+       inhouseStatus.classList.add('is-info');
+-      inhouseStatus.innerHTML = `✓ Auto-filled from ${m.property || 'inhouse'} report (${fmtDateShort(m.businessDate || pickedDate)})`;
++      const reportLabel = m.businessDate ? fmtDateShort(m.businessDate) : 'no date';
++      let suffix = '';
++      if (result.stale) {
++        suffix = ` · ⚠ data may be stale (latest: ${fmtDateShort(result.latest)})`;
++      } else if (result.roomOnly && pickedDate) {
++        suffix = ` · room not in residence on ${fmtDateShort(pickedDate)} — used latest record`;
++      } else if (result.roomOnly) {
++        suffix = ' · used latest record';
++      }
++      inhouseStatus.innerHTML = `✓ Auto-filled from ${m.property || 'inhouse'} report (${reportLabel})${suffix}`;
+     } else {
+-      // Clear fields we previously autofilled
++      // No match — leave fields blank (clear anything we previously autofilled)
+       if (autofilled.guest) { guest.value = ''; autofilled.guest = false; }
+       if (autofilled.departure) { departure.value = ''; autofilled.departure = false; }
+-      // Show contextual reason
+       if (result.reason === 'noreports') {
+-        // Silent — show a gentle hint only the first time
+-        if (!STATE.inhouseGuests.length) {
+-          inhouseStatus.textContent = ''; // truly silent — don't nag
+-        }
+-      } else if (result.reason === 'outdated') {
+-        inhouseStatus.classList.add('is-warn');
+-        inhouseStatus.textContent = `⚠ Inhouse data outdated (latest report: ${fmtDateShort(result.latest)}). Fill manually.`;
+-      } else if (r) {
+-        inhouseStatus.textContent = `No inhouse guest in room ${r} on ${fmtDateShort(pickedDate)}.`;
++        inhouseStatus.textContent = ''; // silent — no PDFs loaded
++      } else {
++        inhouseStatus.textContent = `No inhouse record for room ${r}.`;
+       }
+     }
+   }
+@@ -2598,26 +2639,41 @@ function isInhouseDataCurrent(bookingDate) {
+   return latest >= bookingDate;
+ }
+ /**
+- * Lookup guest by room + booking date.
++ * Lookup guest by room (and optionally booking date).
++ * Always returns the best available record for the room — fields the user
++ * hasn't filled in are autofilled from the most relevant PDF row.
+  * Returns:
+- *   {match: record} when a current, valid match is found
+- *   {match: null, reason: 'none' | 'outdated' | 'noreports' | 'norange'}
++ *   {match: record}                 → in-residence match for the booking date
++ *   {match: record, stale: true}    → in-range match but reports are older than booking date
++ *   {match: record, roomOnly: true} → no in-range match, fell back to most recent record
++ *   {match: null, reason: 'noreports'}  → no PDFs loaded
++ *   {match: null, reason: 'none'}       → room not found in any PDF
+  */
+ function lookupInhouse(room, dateISO) {
+   if (!STATE.inhouseGuests.length) return {match: null, reason: 'noreports'};
+-  if (!room || !dateISO) return {match: null, reason: 'none'};
+-  if (!isInhouseDataCurrent(dateISO)) return {match: null, reason: 'outdated', latest: inhouseLatestBusinessDate()};
+-  const r = String(room).replace(/[^\w]/g, '').trim().toLowerCase();
++  const r = String(room || '').replace(/[^\w]/g, '').trim().toLowerCase();
+   if (!r) return {match: null, reason: 'none'};
+-  const matches = STATE.inhouseGuests.filter(g => {
+-    if (String(g.room).toLowerCase() !== r) return false;
+-    if (g.arrival && dateISO < g.arrival) return false;
+-    if (g.departure && dateISO > g.departure) return false;
+-    return true;
+-  });
+-  if (!matches.length) return {match: null, reason: 'none'};
+-  matches.sort((a, b) => (b.businessDate || '').localeCompare(a.businessDate || ''));
+-  return {match: matches[0]};
++
++  const allRoomMatches = STATE.inhouseGuests.filter(g => String(g.room).toLowerCase() === r);
++  if (!allRoomMatches.length) return {match: null, reason: 'none'};
++
++  const latest = inhouseLatestBusinessDate();
++
++  if (dateISO) {
++    const inRange = allRoomMatches.filter(g => {
++      if (g.arrival && dateISO < g.arrival) return false;
++      if (g.departure && dateISO > g.departure) return false;
++      return true;
++    });
++    if (inRange.length) {
++      inRange.sort((a, b) => (b.businessDate || '').localeCompare(a.businessDate || ''));
++      const stale = !isInhouseDataCurrent(dateISO);
++      return stale ? {match: inRange[0], stale: true, latest} : {match: inRange[0]};
++    }
++  }
++
++  allRoomMatches.sort((a, b) => (b.businessDate || '').localeCompare(a.businessDate || ''));
++  return {match: allRoomMatches[0], roomOnly: true, latest};
+ }
+ 
+ async function ingestInhousePDFs(fileList) {
+@@ -2697,14 +2753,30 @@ function openInhouseModal() {
+     el('small', {}, 'Daily TRML / TRMD inhouse reports — guest data is extracted in your browser, never uploaded.')
+   );
+ 
++  const listHeader = el('div', {class: 'report-list-header'});
+   const list = el('div', {class: 'report-list', id: 'inhouse-list'});
+ 
+   function renderList() {
+     list.innerHTML = '';
+-    if (!STATE.inhouseReports.length) {
+-      list.append(el('div', {class: 'dash-empty'}, 'No reports loaded yet.'));
++    listHeader.innerHTML = '';
++    const total = STATE.inhouseReports.length;
++    if (!total) {
++      listHeader.append(
++        el('div', {class: 'report-list-title'}, 'Loaded PDFs'),
++        el('div', {class: 'report-list-count'}, '0 files')
++      );
++      list.append(el('div', {class: 'dash-empty'}, 'No PDFs loaded yet — drop files above to get started.'));
+       return;
+     }
++    listHeader.append(
++      el('div', {class: 'report-list-title'}, 'Loaded PDFs'),
++      el('div', {class: 'report-list-count'}, `${total} file${total === 1 ? '' : 's'}`),
++      el('button', {class: 'btn btn-link-danger', title: 'Remove all loaded PDFs', onclick: () => {
++        if (!confirm(`Remove all ${total} PDF${total === 1 ? '' : 's'}?`)) return;
++        for (const r of [...STATE.inhouseReports]) removeInhouseReport(r.filename);
++        renderList();
++      }}, 'Clear all')
++    );
+     const sorted = [...STATE.inhouseReports].sort((a,b) => (b.businessDate||'').localeCompare(a.businessDate||''));
+     const todayStr = todayISO();
+     for (const r of sorted) {
+@@ -2727,8 +2799,9 @@ function openInhouseModal() {
+         el('div', {class: 'property'}, prop),
+         el('div', {class: 'name', title: r.filename}, r.filename),
+         el('div', {class: 'meta'}, meta),
+-        el('button', {class: 'remove', title: 'Remove', onclick: ()=>{ removeInhouseReport(r.filename); renderList(); }},
+-          el('svg', {class:'icon', viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2', 'stroke-linecap':'round', 'stroke-linejoin':'round', html:'<path d="M18 6 6 18M6 6l12 12"/>'})
++        el('button', {class: 'remove', title: `Remove ${r.filename}`, 'aria-label': `Remove ${r.filename}`, onclick: ()=>{ removeInhouseReport(r.filename); renderList(); }},
++          el('svg', {class:'icon', viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2', 'stroke-linecap':'round', 'stroke-linejoin':'round', html:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>'}),
++          el('span', {}, 'Remove')
+         )
+       );
+       list.append(row);
+@@ -2737,6 +2810,13 @@ function openInhouseModal() {
+   renderList();
+ 
+   const progress = el('div', {class: 'parse-progress', style: {display: 'none'}});
++
++  function pickFiles() {
++    const inp = $('#pdf-input');
++    inp.value = '';
++    inp.onchange = () => handleFiles(inp.files);
++    inp.click();
++  }
+   async function handleFiles(files) {
+     if (!files || !files.length) return;
+     progress.style.display = 'flex';
+@@ -2746,12 +2826,7 @@ function openInhouseModal() {
+     progress.style.display = 'none';
+     renderList();
+   }
+-  dropZone.addEventListener('click', () => {
+-    const inp = $('#pdf-input');
+-    inp.value = '';
+-    inp.onchange = () => handleFiles(inp.files);
+-    inp.click();
+-  });
++  dropZone.addEventListener('click', pickFiles);
+   dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('is-drag'); });
+   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('is-drag'));
+   dropZone.addEventListener('drop', (e) => {
+@@ -2760,15 +2835,23 @@ function openInhouseModal() {
+     handleFiles(e.dataTransfer.files);
+   });
+ 
++  const addBtn = el('button', {class: 'btn btn-primary', onclick: pickFiles},
++    el('svg', {class: 'icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', html: '<path d="M12 5v14M5 12h14"/>'}),
++    'Add PDFs'
++  );
++
+   const node = el('div', {},
+     el('h2', {}, 'Inhouse ', el('em', {}, 'reports')),
+-    el('div', {class: 'sub'}, 'Upload daily TRML or TRMD inhouse meal-plan PDFs. New bookings will then auto-fill guest name and departure date from the room number — but only when reports are current.'),
++    el('div', {class: 'sub'}, 'Upload daily TRML or TRMD inhouse meal-plan PDFs. New bookings auto-fill guest name and departure date from the room number — falling back to the latest record when reports are older than the booking date.'),
+     el('div', {class: 'body'},
+       dropZone,
+       progress,
++      listHeader,
+       list,
+     ),
+     el('div', {class: 'foot'},
++      addBtn,
++      el('div', {style:{flex:1}}),
+       el('button', {class: 'btn', onclick: closeModal}, 'Close')
+     )
+   );
+-- 
+2.43.0
