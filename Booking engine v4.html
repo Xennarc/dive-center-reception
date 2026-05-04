@@ -920,6 +920,123 @@ animation: spin .6s linear infinite;
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; border: 2px solid var(--bg); }
+
+/* ================================================================
+   Operational tracking — status pills, banners, capacity override
+   ================================================================ */
+.day-summary-inactive { color: var(--muted); font-style: italic; }
+
+.show-cancelled-toggle {
+  margin-top: 6px; padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-size: 12px; cursor: pointer;
+}
+.show-cancelled-toggle:hover { color: var(--ink); border-color: var(--border-strong); }
+.show-cancelled-toggle.is-on { background: var(--card); color: var(--ink); border-color: var(--border-strong); }
+
+/* Status pills inside the bookings table */
+.col-status { width: 110px; }
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 500; line-height: 1.4;
+  margin-right: 4px;
+}
+.pill-pending   { background: transparent; color: var(--muted); }
+.pill-attended  { background: rgba(74, 124, 89, 0.18); color: #3a6647; }
+.pill-noshow    { background: rgba(168, 90, 74, 0.18); color: #8c4636; }
+.pill-paid      { background: rgba(74, 124, 89, 0.18); color: #3a6647; }
+.pill-comp      { background: rgba(133, 100, 55, 0.18); color: #6b502c; }
+.pill-cancelled { background: rgba(168, 90, 74, 0.22); color: #8c4636; }
+.pill-postponed { background: rgba(133, 100, 55, 0.22); color: #6b502c; }
+.pill-good      { background: rgba(74, 124, 89, 0.18); color: #3a6647; }
+.pill-warn      { background: rgba(168, 90, 74, 0.22); color: #8c4636; }
+
+/* Strikethrough cancelled rows */
+.exc-table tr.row-cancelled td:not(.col-status) { color: var(--muted); text-decoration: line-through; }
+.exc-table tr.row-postponed  td:not(.col-status) { color: var(--muted); font-style: italic; }
+.exc-table tr.row-cancelled, .exc-table tr.row-postponed { opacity: 0.78; }
+
+/* Activity-cancelled banner on excursion card */
+.exc-card.is-day-cancelled { border-color: rgba(168, 90, 74, 0.5); }
+.activity-cancelled-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; background: rgba(168, 90, 74, 0.12);
+  border-bottom: 1px solid rgba(168, 90, 74, 0.35);
+  color: #8c4636; font-size: 13px; flex-wrap: wrap;
+}
+.activity-cancelled-banner .acb-main { flex: 1; min-width: 200px; }
+.activity-cancelled-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Capacity override pencil button + popover */
+.cap-edit-btn {
+  margin-left: 6px; padding: 0 4px; font-size: 11px; line-height: 1;
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  cursor: pointer; border-radius: 4px;
+}
+.cap-edit-btn:hover { color: var(--ink); border-color: var(--border); background: var(--card); }
+.cap-override-tag { color: var(--muted); font-size: 11px; margin-left: 4px; font-style: italic; }
+.cap-popover {
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: var(--shadow-md); padding: 12px; width: 220px;
+}
+.cap-pop-title { font-weight: 600; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
+.cap-pop-help  { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+.cap-popover input[type=number] { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+.cap-pop-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+/* Edit-modal status banner */
+.status-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; border-radius: 8px; margin: 8px 0; font-size: 13px;
+}
+.status-banner.is-cancelled { background: rgba(168, 90, 74, 0.14); color: #8c4636; }
+.status-banner.is-postponed { background: rgba(133, 100, 55, 0.14); color: #6b502c; }
+
+/* Edit-modal Operations row (attendance + payment) */
+.op-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.op-cell label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.seg-pills { display: flex; gap: 4px; }
+.seg-pill {
+  flex: 1; padding: 6px 8px; font-size: 12px; line-height: 1.2;
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--ink); cursor: pointer;
+}
+.seg-pill:hover { background: var(--card); }
+.seg-pill.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* Cancel-with-reason inline form */
+.cancel-inline {
+  margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(168, 90, 74, 0.3);
+  background: rgba(168, 90, 74, 0.06); border-radius: 8px;
+}
+.cancel-inline label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.cancel-inline textarea {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; resize: vertical;
+}
+.cancel-inline-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+/* Postpone modal radio rows */
+.radio-row {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  margin-bottom: 8px;
+}
+.radio-row:hover { background: var(--card); }
+.radio-row input[type=radio] { margin-top: 3px; }
+.radio-row .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* Activity-cancel modal helpers */
+.checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.checkbox-row input[type=checkbox] { width: 16px; height: 16px; }
+
+/* Small / link buttons */
+.btn-small { padding: 3px 9px; font-size: 11px; border-radius: 6px; }
+.btn-link-danger {
+  background: transparent; border: 1px solid transparent;
+  color: #8c4636; padding: 4px 8px; cursor: pointer; font-size: 12px;
+}
+.btn-link-danger:hover { background: rgba(168, 90, 74, 0.08); border-color: rgba(168, 90, 74, 0.3); }
 </style>
 
 </head>
@@ -1030,6 +1147,7 @@ const STATE = {
   excFilter: '',
   search: '',
   selectedDate: null,        // ISO
+  showCancelled: false,      // toggle: include cancelled/postponed in agenda lists
   inhouseGuests: [],         // [{room, name, arrival, departure, property, businessDate, sourceFile}]
   inhouseReports: [],        // [{filename, property, businessDate, guestCount, error?}]
 };
@@ -1298,7 +1416,7 @@ function detectLayout(ws) {
 /* ============================================================
    Booking I/O
    ============================================================ */
-function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, dateISO, capacity, excursionColor) {
+function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, dateISO, capacity, excursionColor, fileEntry) {
   const row = ws.getRow(rowIdx);
   const at = (cIdx) => cIdx == null ? null : row.getCell(cIdx);
   const slot = cellRaw(row.getCell(1));
@@ -1314,6 +1432,7 @@ function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, date
   const staff = cellStr(at(layout.layout.staff));
   const isEmpty = !room && !guest && adults == null && child == null
     && !liability && !billNo && !remarks && !staff && !departureRaw;
+  const meta = getBookingMeta(fileEntry, sheetName, rowIdx);
   return {
     id: `${fileKey}::${sheetName}::${rowIdx}`,
     fileKey, sheetName, rowIdx,
@@ -1321,6 +1440,14 @@ function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, date
     slot, room, guest, departure, departureRaw,
     adults, child, liability, billNo, remarks, staff,
     isEmpty,
+    status: meta.status,
+    cancelReason: meta.cancelReason,
+    cancelledAt: meta.cancelledAt,
+    postponedTo: meta.postponedTo,
+    postponedRef: meta.postponedRef,
+    attended: meta.attended,
+    paid: meta.paid,
+    paidAt: meta.paidAt,
   };
 }
 function writeBooking(fileEntry, sheetName, rowIdx, fields) {
@@ -1353,6 +1480,281 @@ function clearBooking(fileEntry, sheetName, rowIdx) {
     liability: null, billNo: null, remarks: null, staff: null,
   });
 }
+
+/* Soft-cancel: keep the row as a log, mark it cancelled in meta. */
+function cancelBookingSoft(fileEntry, sheetName, rowIdx, reason) {
+  setBookingMeta(fileEntry, sheetName, rowIdx, {
+    status: 'cancelled',
+    cancelReason: reason || '',
+    cancelledAt: nowISO(),
+  });
+  rebuildBookings();
+  updateStatus();
+}
+
+/* Restore a cancelled / postponed booking back to active. */
+function restoreBooking(fileEntry, sheetName, rowIdx) {
+  setBookingMeta(fileEntry, sheetName, rowIdx, {
+    status: 'active',
+    cancelReason: '',
+    cancelledAt: '',
+    postponedTo: '',
+    postponedRef: '',
+  });
+  rebuildBookings();
+  updateStatus();
+}
+
+/* Postpone: mark original as postponed; if mode==='move', also create a new
+   active row on the target date inside the same workbook. Returns
+   { ok, newId? , error? }. */
+function postponeBooking(fileEntry, sheetName, rowIdx, newDateISO, mode, sourceFields) {
+  if (!newDateISO) return { ok: false, error: 'No target date' };
+  if (mode === 'annotate') {
+    setBookingMeta(fileEntry, sheetName, rowIdx, {
+      status: 'postponed',
+      postponedTo: newDateISO,
+      cancelledAt: nowISO(),
+    });
+    rebuildBookings();
+    updateStatus();
+    return { ok: true };
+  }
+  // mode === 'move' — find a target sheet in the same workbook
+  const targetSheet = fileEntry.sheets.find(s => s.layout.dateISO === newDateISO);
+  if (!targetSheet) return { ok: false, error: 'No sheet exists for that date in this workbook' };
+
+  const lay = targetSheet.layout;
+  // Find the first empty row on the target sheet
+  let targetRow = -1;
+  for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
+    const b = readBooking(targetSheet.ws, targetSheet.sheetName, fileEntry.name, lay, r,
+      fileEntry.excursionName, lay.dateISO, lay.capacity, fileEntry.excursionColor, fileEntry);
+    const m = getBookingMeta(fileEntry, targetSheet.sheetName, r);
+    if (b.isEmpty && (m.status === 'active' || !m.status)) { targetRow = r; break; }
+  }
+  if (targetRow < 0) return { ok: false, error: 'No empty slot on target date' };
+
+  // Copy fields onto the new row
+  writeBooking(fileEntry, targetSheet.sheetName, targetRow, {
+    room: sourceFields.room || null,
+    guest: sourceFields.guest || null,
+    departure: sourceFields.departure || null,
+    adults: sourceFields.adults ?? null,
+    child: sourceFields.child ?? null,
+    liability: sourceFields.liability || null,
+    billNo: sourceFields.billNo || null,
+    remarks: (sourceFields.remarks ? sourceFields.remarks + ' · ' : '') + `(postponed from ${sheetName})`,
+    staff: sourceFields.staff || null,
+  });
+  // Mark the original as postponed with backref
+  setBookingMeta(fileEntry, sheetName, rowIdx, {
+    status: 'postponed',
+    postponedTo: newDateISO,
+    postponedRef: `${targetSheet.sheetName}::${targetRow}`,
+    cancelledAt: nowISO(),
+  });
+  rebuildBookings();
+  updateStatus();
+  return { ok: true, newSheet: targetSheet.sheetName, newRow: targetRow };
+}
+
+/* ============================================================
+   Meta sheets (hidden) — booking-level + sheet-level extras
+   _BookingMeta: per-row status, attendance, payment, cancel/postpone log
+   _SheetMeta:   per-sheet activity-cancellation + custom capacity
+   ============================================================ */
+const META_BOOKING_SHEET = '_BookingMeta';
+const META_SHEET_SHEET   = '_SheetMeta';
+const META_SHEET_NAMES   = [META_BOOKING_SHEET, META_SHEET_SHEET];
+
+const BOOKING_META_COLS = ['sheetName','rowIdx','status','cancelReason','cancelledAt','postponedTo','postponedRef','attended','paid','paidAt'];
+const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity'];
+
+const BOOKING_META_DEFAULTS = {
+  status: 'active', cancelReason: '', cancelledAt: '',
+  postponedTo: '', postponedRef: '',
+  attended: 'pending', paid: 'pending', paidAt: '',
+};
+const SHEET_META_DEFAULTS = {
+  activityCancelled: false, cancelReasonCat: '', cancelReasonNote: '',
+  guestsInformed: false, cancelledAt: '', customCapacity: null,
+};
+
+function nowISO() { return new Date().toISOString(); }
+function asBool(v) {
+  if (v === true || v === 1) return true;
+  if (typeof v === 'string') return v.toLowerCase() === 'true';
+  return false;
+}
+
+function readMetaSheets(wb) {
+  const bookingMeta = new Map();
+  const sheetMeta = new Map();
+
+  const bws = wb.getWorksheet(META_BOOKING_SHEET);
+  if (bws) {
+    const headers = {};
+    const headerRow = bws.getRow(1);
+    const colCount = Math.max(headerRow.cellCount, BOOKING_META_COLS.length);
+    for (let c = 1; c <= colCount; c++) {
+      const h = cellStr(headerRow.getCell(c));
+      if (h) headers[h] = c;
+    }
+    const last = bws.actualRowCount || bws.rowCount || 1;
+    for (let r = 2; r <= last; r++) {
+      const row = bws.getRow(r);
+      const sheetName = cellStr(row.getCell(headers.sheetName));
+      const rowIdx = cellNum(row.getCell(headers.rowIdx));
+      if (!sheetName || rowIdx == null) continue;
+      const obj = {};
+      for (const col of BOOKING_META_COLS) {
+        if (col === 'sheetName' || col === 'rowIdx' || headers[col] == null) continue;
+        const v = cellRaw(row.getCell(headers[col]));
+        if (v !== null && v !== '') obj[col] = String(v);
+      }
+      bookingMeta.set(`${sheetName}::${rowIdx}`, obj);
+    }
+  }
+
+  const sws = wb.getWorksheet(META_SHEET_SHEET);
+  if (sws) {
+    const headers = {};
+    const headerRow = sws.getRow(1);
+    const colCount = Math.max(headerRow.cellCount, SHEET_META_COLS.length);
+    for (let c = 1; c <= colCount; c++) {
+      const h = cellStr(headerRow.getCell(c));
+      if (h) headers[h] = c;
+    }
+    const last = sws.actualRowCount || sws.rowCount || 1;
+    for (let r = 2; r <= last; r++) {
+      const row = sws.getRow(r);
+      const sheetName = cellStr(row.getCell(headers.sheetName));
+      if (!sheetName) continue;
+      const obj = {};
+      for (const col of SHEET_META_COLS) {
+        if (col === 'sheetName' || headers[col] == null) continue;
+        const v = cellRaw(row.getCell(headers[col]));
+        if (v == null || v === '') continue;
+        if (col === 'activityCancelled' || col === 'guestsInformed') obj[col] = asBool(v);
+        else if (col === 'customCapacity') { const n = Number(v); obj[col] = isNaN(n) ? null : n; }
+        else obj[col] = String(v);
+      }
+      sheetMeta.set(sheetName, obj);
+    }
+  }
+
+  return { bookingMeta, sheetMeta };
+}
+
+function ensureMetaSheets(wb) {
+  let bws = wb.getWorksheet(META_BOOKING_SHEET);
+  if (!bws) {
+    bws = wb.addWorksheet(META_BOOKING_SHEET, { state: 'hidden' });
+    bws.addRow(BOOKING_META_COLS);
+  } else {
+    bws.state = 'hidden';
+    // Repair header row if missing
+    const headerRow = bws.getRow(1);
+    let hasHeader = false;
+    for (let c = 1; c <= BOOKING_META_COLS.length; c++) {
+      if (cellStr(headerRow.getCell(c))) { hasHeader = true; break; }
+    }
+    if (!hasHeader) {
+      BOOKING_META_COLS.forEach((h, i) => { headerRow.getCell(i+1).value = h; });
+      headerRow.commit();
+    }
+  }
+  let sws = wb.getWorksheet(META_SHEET_SHEET);
+  if (!sws) {
+    sws = wb.addWorksheet(META_SHEET_SHEET, { state: 'hidden' });
+    sws.addRow(SHEET_META_COLS);
+  } else {
+    sws.state = 'hidden';
+    const headerRow = sws.getRow(1);
+    let hasHeader = false;
+    for (let c = 1; c <= SHEET_META_COLS.length; c++) {
+      if (cellStr(headerRow.getCell(c))) { hasHeader = true; break; }
+    }
+    if (!hasHeader) {
+      SHEET_META_COLS.forEach((h, i) => { headerRow.getCell(i+1).value = h; });
+      headerRow.commit();
+    }
+  }
+  return { bws, sws };
+}
+
+function flushMetaSheets(fileEntry) {
+  const { bws, sws } = ensureMetaSheets(fileEntry.wb);
+  // Replace data rows (preserve header at row 1)
+  if (bws.rowCount > 1) bws.spliceRows(2, bws.rowCount - 1);
+  if (fileEntry.bookingMeta) {
+    for (const [key, partial] of fileEntry.bookingMeta.entries()) {
+      const [sheetName, rowIdxStr] = key.split('::');
+      const rowIdx = Number(rowIdxStr);
+      const merged = { sheetName, rowIdx, ...partial };
+      bws.addRow(BOOKING_META_COLS.map(c => {
+        const v = merged[c];
+        return (v == null || v === '') ? '' : v;
+      }));
+    }
+  }
+  if (sws.rowCount > 1) sws.spliceRows(2, sws.rowCount - 1);
+  if (fileEntry.sheetMeta) {
+    for (const [sheetName, partial] of fileEntry.sheetMeta.entries()) {
+      const merged = { sheetName, ...partial };
+      sws.addRow(SHEET_META_COLS.map(c => {
+        const v = merged[c];
+        if (v == null || v === '') return '';
+        if (typeof v === 'boolean') return v ? 'true' : 'false';
+        return v;
+      }));
+    }
+  }
+}
+
+function getBookingMeta(fileEntry, sheetName, rowIdx) {
+  const stored = fileEntry?.bookingMeta?.get(`${sheetName}::${rowIdx}`) || {};
+  return { ...BOOKING_META_DEFAULTS, ...stored };
+}
+
+function setBookingMeta(fileEntry, sheetName, rowIdx, partial) {
+  if (!fileEntry.bookingMeta) fileEntry.bookingMeta = new Map();
+  const key = `${sheetName}::${rowIdx}`;
+  const existing = fileEntry.bookingMeta.get(key) || {};
+  const merged = { ...existing, ...partial };
+  // Strip empties so the meta sheet stays compact
+  for (const k of Object.keys(merged)) {
+    if (merged[k] == null || merged[k] === '') delete merged[k];
+  }
+  // If only defaults remain, drop the entry entirely
+  const meaningful = Object.entries(merged).some(([k, v]) =>
+    BOOKING_META_DEFAULTS[k] === undefined ? v != null && v !== '' : v !== BOOKING_META_DEFAULTS[k]
+  );
+  if (!meaningful) fileEntry.bookingMeta.delete(key);
+  else fileEntry.bookingMeta.set(key, merged);
+  fileEntry.dirty = true;
+}
+
+function getSheetMeta(fileEntry, sheetName) {
+  const stored = fileEntry?.sheetMeta?.get(sheetName) || {};
+  return { ...SHEET_META_DEFAULTS, ...stored };
+}
+
+function setSheetMeta(fileEntry, sheetName, partial) {
+  if (!fileEntry.sheetMeta) fileEntry.sheetMeta = new Map();
+  const existing = fileEntry.sheetMeta.get(sheetName) || {};
+  const merged = { ...existing, ...partial };
+  for (const k of Object.keys(merged)) {
+    if (merged[k] == null || merged[k] === '') delete merged[k];
+  }
+  const meaningful = Object.entries(merged).some(([k, v]) =>
+    SHEET_META_DEFAULTS[k] === undefined ? v != null && v !== '' : v !== SHEET_META_DEFAULTS[k]
+  );
+  if (!meaningful) fileEntry.sheetMeta.delete(sheetName);
+  else fileEntry.sheetMeta.set(sheetName, merged);
+  fileEntry.dirty = true;
+}
 function toDeparture(s) {
   if (!s) return null;
   const iso = parseDateValue(s);
@@ -1377,14 +1779,17 @@ async function loadFiles(fileSpecs){
       await wb.xlsx.load(buf.buffer ? buf.buffer : buf);
       const sheets = [];
       wb.eachSheet((ws) => {
+        if (META_SHEET_NAMES.includes(ws.name)) return;
         const lay = detectLayout(ws);
         if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
       });
+      const { bookingMeta, sheetMeta } = readMetaSheets(wb);
       STATE.files.push({
         name: spec.name,
         fileHandle: spec.fileHandle || null,
         fileObj: spec.fileObj || null,
         wb, sheets, dirty: false,
+        bookingMeta, sheetMeta,
       });
     } catch (err) {
       console.error('load failed', spec.name, err);
@@ -1407,8 +1812,10 @@ function rebuildBookings(){
     for (const s of f.sheets) {
       const lay = s.layout;
       for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
-        const b = readBooking(s.ws, s.sheetName, f.name, lay, r, f.excursionName, lay.dateISO, lay.capacity, f.excursionColor);
-        if (!b.isEmpty) out.push(b);
+        const b = readBooking(s.ws, s.sheetName, f.name, lay, r, f.excursionName, lay.dateISO, lay.capacity, f.excursionColor, f);
+        // Keep non-empty rows AND any row that has meta state (cancellation log
+        // for a row whose data may have been cleared in an older version).
+        if (!b.isEmpty || (b.status && b.status !== 'active')) out.push(b);
       }
     }
   }
@@ -1424,6 +1831,7 @@ async function saveAll() {
   let saved = 0;
   for (const f of dirtyFiles) {
     try {
+      flushMetaSheets(f);
       const buf = await f.wb.xlsx.writeBuffer();
       if (STATE.mode === 'fs' && f.fileHandle) {
         const w = await f.fileHandle.createWritable();
@@ -1644,8 +2052,13 @@ function renderAgenda() {
   // Day heading + summary
   const dayBookings = STATE.bookings.filter(b =>
     b.dateISO === d && (!STATE.excFilter || b.excursionName === STATE.excFilter));
-  const totalCap = sheets.reduce((s, x) => s + (x.sheet.layout.capacity || 0), 0);
-  const totalPax = dayBookings.reduce((s,b) => s + (b.adults||0) + (b.child||0), 0);
+  const dayActive = dayBookings.filter(b => b.status === 'active' || !b.status);
+  const dayInactive = dayBookings.filter(b => b.status === 'cancelled' || b.status === 'postponed');
+  const totalCap = sheets.reduce((s, x) => {
+    const m = getSheetMeta(x.file, x.sheet.sheetName);
+    return s + (m.customCapacity != null ? m.customCapacity : (x.sheet.layout.capacity || 0));
+  }, 0);
+  const totalPax = dayActive.reduce((s,b) => s + (b.adults||0) + (b.child||0), 0);
 
   const heading = el('div', {class:'day-heading'},
     el('h1', {}, fmtDayOfWeek(d), ', ', el('em', {}, fmtDateLong(d).split(', ').slice(1).join(', ')))
@@ -1660,10 +2073,23 @@ function renderAgenda() {
       el('strong', {}, String(sheets.length)),
       ` excursion${sheets.length>1?'s':''} · `,
       el('strong', {}, String(totalPax)),
-      ` of ${totalCap} pax booked`
+      ` of ${totalCap} pax booked`,
+      dayInactive.length ? el('span', {class:'day-summary-inactive'}, ` · ${dayInactive.length} cancelled / postponed`) : null,
     );
   }
   heading.append(summary);
+
+  // Show-cancelled toggle (only meaningful when inactive bookings exist somewhere)
+  if (sheets.length > 0) {
+    const toggleBtn = el('button', {
+      class: 'show-cancelled-toggle' + (STATE.showCancelled ? ' is-on' : ''),
+      onclick: () => {
+        STATE.showCancelled = !STATE.showCancelled;
+        renderView();
+      },
+    }, STATE.showCancelled ? '✓ Showing cancelled / postponed' : 'Show cancelled / postponed');
+    heading.append(toggleBtn);
+  }
   wrap.append(heading);
 
   if (!sheets.length) {
@@ -1686,20 +2112,59 @@ function renderAgenda() {
 
 function renderExcursionCard(file, sheet) {
   const lay = sheet.layout;
-  const sheetBookings = STATE.bookings
+  const sheetMeta = getSheetMeta(file, sheet.sheetName);
+  const allBookings = STATE.bookings
     .filter(b => b.fileKey === file.name && b.sheetName === sheet.sheetName)
     .sort((a,b) => (a.slot||0) - (b.slot||0));
-  const filled = sheetBookings.reduce((s,b)=> s + (b.adults||0) + (b.child||0), 0);
-  const cap = lay.capacity || 0;
+  const activeBookings = allBookings.filter(b => b.status === 'active' || !b.status);
+  const inactiveBookings = allBookings.filter(b => b.status === 'cancelled' || b.status === 'postponed');
+
+  // Pax counts use ACTIVE bookings only — cancelled/postponed don't fill the boat.
+  const filled = activeBookings.reduce((s,b)=> s + (b.adults||0) + (b.child||0), 0);
+  const cap = (sheetMeta.customCapacity != null ? sheetMeta.customCapacity : (lay.capacity || 0));
   const pct = cap ? Math.min(100, (filled/cap)*100) : 0;
   const status = filled >= cap ? 'is-full' : (cap && filled >= cap * 0.85) ? 'is-warn' : '';
 
-  const card = el('div', {class: 'exc-card', style: {'--exc-color': file.excursionColor}});
+  const card = el('div', {class: 'exc-card' + (sheetMeta.activityCancelled ? ' is-day-cancelled' : ''), style: {'--exc-color': file.excursionColor}});
+
+  // Activity-cancelled banner (top)
+  if (sheetMeta.activityCancelled) {
+    const reasonLabel = ({weather:'Weather', guests:'Guest cancellation', operational:'Operational', other:'Other'})[sheetMeta.cancelReasonCat] || 'Cancelled';
+    const banner = el('div', {class: 'activity-cancelled-banner'},
+      el('div', {class:'acb-main'},
+        el('strong', {}, 'ACTIVITY CANCELLED'),
+        ' · ', reasonLabel,
+        sheetMeta.cancelReasonNote ? ` — ${sheetMeta.cancelReasonNote}` : '',
+      ),
+      el('div', {class:'acb-side'},
+        el('span', {class: 'pill ' + (sheetMeta.guestsInformed ? 'pill-good' : 'pill-warn')},
+          sheetMeta.guestsInformed ? '✓ Guests informed' : '⚠ Guests NOT informed'),
+        el('button', {class:'btn btn-small', onclick: () => openActivityCancelModal(file, sheet)}, 'Edit'),
+        el('button', {class:'btn btn-small', onclick: () => {
+          setSheetMeta(file, sheet.sheetName, {activityCancelled: false, cancelReasonCat:'', cancelReasonNote:'', guestsInformed:false, cancelledAt:''});
+          rebuildBookings(); updateStatus();
+          toast('Activity un-cancelled', 'success'); renderView();
+        }}, 'Restore'),
+      )
+    );
+    card.append(banner);
+  }
+
+  // Capacity edit popover
+  const capEditBtn = el('button', {
+    class: 'cap-edit-btn',
+    title: 'Edit slot capacity for this date',
+    onclick: (e) => { e.stopPropagation(); openCapacityPopover(file, sheet, capEditBtn); },
+  }, '✎');
 
   const head = el('div', {class:'exc-head'},
     el('div', {class:'exc-name'}, file.excursionName),
     el('div', {class:'exc-cap'},
-      el('div', {class:'exc-cap-text'}, el('strong', {}, String(filled)), ' / ', String(cap), ' pax'),
+      el('div', {class:'exc-cap-text'},
+        el('strong', {}, String(filled)), ' / ', String(cap), ' pax',
+        sheetMeta.customCapacity != null ? el('span', {class:'cap-override-tag', title:'Custom capacity'}, ' • custom') : null,
+        capEditBtn,
+      ),
       el('div', {class:'cap-bar'},
         el('div', {class: 'cap-bar-fill ' + status, style: {width: pct + '%'}})
       )
@@ -1707,8 +2172,16 @@ function renderExcursionCard(file, sheet) {
   );
   card.append(head);
 
-  if (sheetBookings.length === 0) {
-    card.append(el('div', {class:'empty-card-body'}, 'No bookings yet'));
+  // Decide which bookings to show
+  const showCancelled = STATE.showCancelled;
+  const visibleBookings = showCancelled ? allBookings : activeBookings;
+
+  if (visibleBookings.length === 0) {
+    card.append(el('div', {class:'empty-card-body'},
+      activeBookings.length === 0 && inactiveBookings.length > 0
+        ? `No active bookings (${inactiveBookings.length} cancelled/postponed — toggle "Show cancelled" to see them)`
+        : 'No bookings yet'
+    ));
   } else {
     const tbl = el('table', {class:'exc-table'});
     tbl.append(el('thead', {},
@@ -1717,18 +2190,23 @@ function renderExcursionCard(file, sheet) {
         el('th', {class:'col-room'}, 'Room'),
         el('th', {}, 'Guest'),
         el('th', {class:'num-col col-pax'}, 'Pax'),
+        el('th', {class:'col-status'}, 'Status'),
         el('th', {class:'col-bill'}, 'Bill'),
         el('th', {class:'col-remarks'}, 'Remarks'),
         el('th', {class:'col-staff'}, 'Staff'),
       )
     ));
     const body = el('tbody');
-    for (const b of sheetBookings) {
-      body.append(el('tr', { onclick: () => openEditModal(b) },
+    for (const b of visibleBookings) {
+      const rowCls = [];
+      if (b.status === 'cancelled') rowCls.push('row-cancelled');
+      if (b.status === 'postponed') rowCls.push('row-postponed');
+      body.append(el('tr', { class: rowCls.join(' '), onclick: () => openEditModal(b) },
         el('td', {class:'col-slot'}, String(b.slot || '')),
         el('td', {class:'col-room'}, b.room || ''),
         el('td', {class:'col-guest'}, b.guest || ''),
         el('td', {class:'col-pax'}, `${b.adults||0}+${b.child||0}`),
+        el('td', {class:'col-status'}, ...renderBookingStatusPills(b)),
         el('td', {class:'col-bill'}, b.billNo || ''),
         el('td', {class:'col-remarks', title: b.remarks || ''}, b.remarks || ''),
         el('td', {class:'col-staff'}, b.staff || ''),
@@ -1738,16 +2216,140 @@ function renderExcursionCard(file, sheet) {
     card.append(tbl);
   }
 
-  card.append(el('div', {class:'exc-add-row'},
+  // Footer actions
+  const footer = el('div', {class:'exc-add-row'},
     el('button', {
       class:'btn',
       onclick: ()=> openAddModal({excursionName: file.excursionName, dateISO: lay.dateISO})
     },
       el('svg', {class:'icon', viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2', 'stroke-linecap':'round', 'stroke-linejoin':'round', html:'<path d="M12 5v14M5 12h14"/>'}),
       'Add booking'
-    )
-  ));
+    ),
+    el('div', {style:{flex:1}}),
+  );
+  if (!sheetMeta.activityCancelled) {
+    footer.append(el('button', {
+      class: 'btn btn-link-danger',
+      onclick: () => openActivityCancelModal(file, sheet),
+    }, 'Mark activity cancelled'));
+  }
+  card.append(footer);
   return card;
+}
+
+/* Render the inline status pills for a booking row. */
+function renderBookingStatusPills(b) {
+  const pills = [];
+  if (b.status === 'cancelled') {
+    pills.push(el('span', {class:'pill pill-cancelled', title: b.cancelReason || ''}, 'Cancelled'));
+  } else if (b.status === 'postponed') {
+    pills.push(el('span', {class:'pill pill-postponed', title: b.postponedTo ? `→ ${b.postponedTo}` : ''}, 'Postponed'));
+  } else {
+    if (b.attended === 'yes') pills.push(el('span', {class:'pill pill-attended'}, 'Attended'));
+    else if (b.attended === 'no') pills.push(el('span', {class:'pill pill-noshow'}, 'No-show'));
+    if (b.paid === 'yes') pills.push(el('span', {class:'pill pill-paid'}, 'Paid'));
+    else if (b.paid === 'comp') pills.push(el('span', {class:'pill pill-comp'}, 'Comp'));
+  }
+  return pills.length ? pills : [el('span', {class:'pill pill-pending'}, '—')];
+}
+
+/* Modal: mark / edit activity-level cancellation. */
+function openActivityCancelModal(file, sheet) {
+  const cur = getSheetMeta(file, sheet.sheetName);
+  const reasonSel = el('select', {},
+    el('option', {value:''}, 'Choose reason…'),
+    el('option', {value:'weather'}, 'Weather'),
+    el('option', {value:'guests'}, 'Guest cancellation'),
+    el('option', {value:'operational'}, 'Operational (boat / staff / equipment)'),
+    el('option', {value:'other'}, 'Other'),
+  );
+  if (cur.cancelReasonCat) reasonSel.value = cur.cancelReasonCat;
+  const noteInput = el('textarea', {rows:'2', placeholder:'Optional details', value: cur.cancelReasonNote || ''});
+  noteInput.value = cur.cancelReasonNote || '';
+  const informedChk = el('input', {type:'checkbox'});
+  informedChk.checked = !!cur.guestsInformed;
+
+  const node = el('div', {},
+    el('h2', {}, 'Mark activity ', el('em', {}, 'cancelled')),
+    el('div', {class:'sub'}, `${file.excursionName} · ${fmtDateLong(sheet.layout.dateISO)}`),
+    el('div', {class:'body'},
+      el('div', {class:'form-section'}, 'Reason'),
+      el('div', {class:'field'}, el('label', {}, 'Category'), reasonSel),
+      el('div', {class:'field'}, el('label', {}, 'Notes'), noteInput),
+      el('div', {class:'form-section'}, 'Communication'),
+      el('label', {class:'checkbox-row'}, informedChk, ' Guests have been informed'),
+      el('div', {class:'field-help'}, 'Existing bookings on this date are kept as-is and remain visible. They are not auto-cancelled.'),
+    ),
+    el('div', {class:'foot'},
+      el('button', {class:'btn', onclick: closeModal}, 'Close'),
+      el('div', {style:{flex:1}}),
+      el('button', {class:'btn btn-primary', onclick: () => {
+        const cat = reasonSel.value;
+        if (!cat) { toast('Pick a reason', 'error'); return; }
+        setSheetMeta(file, sheet.sheetName, {
+          activityCancelled: true,
+          cancelReasonCat: cat,
+          cancelReasonNote: noteInput.value.trim(),
+          guestsInformed: !!informedChk.checked,
+          cancelledAt: nowISO(),
+        });
+        rebuildBookings(); updateStatus();
+        toast('Activity marked cancelled', 'success');
+        closeModal(); renderView();
+      }}, 'Save'),
+    )
+  );
+  openModal(node);
+}
+
+/* Floating popover under the capacity ✎ button to override slot capacity. */
+function openCapacityPopover(file, sheet, anchorEl) {
+  // Close any existing popover
+  document.querySelectorAll('.cap-popover').forEach(p => p.remove());
+  const cur = getSheetMeta(file, sheet.sheetName);
+  const def = sheet.layout.capacity || 0;
+  const inp = el('input', {type:'number', min:'0', value: cur.customCapacity != null ? String(cur.customCapacity) : ''});
+  const pop = el('div', {class:'cap-popover'},
+    el('div', {class:'cap-pop-title'}, 'Custom capacity'),
+    el('div', {class:'cap-pop-help'}, `Default: ${def}. Leave blank to use default.`),
+    inp,
+    el('div', {class:'cap-pop-actions'},
+      el('button', {class:'btn btn-small', onclick: () => pop.remove()}, 'Cancel'),
+      el('button', {class:'btn btn-small', onclick: () => {
+        setSheetMeta(file, sheet.sheetName, {customCapacity: null});
+        rebuildBookings(); updateStatus();
+        pop.remove(); toast('Capacity reset', 'success'); renderView();
+      }}, 'Reset'),
+      el('button', {class:'btn btn-small btn-primary', onclick: () => {
+        const v = inp.value.trim();
+        const n = v === '' ? null : Number(v);
+        if (v !== '' && (isNaN(n) || n < 0)) { toast('Enter a valid number', 'error'); return; }
+        setSheetMeta(file, sheet.sheetName, {customCapacity: n});
+        rebuildBookings(); updateStatus();
+        pop.remove(); toast('Capacity updated', 'success'); renderView();
+      }}, 'Save'),
+    )
+  );
+  // Position relative to anchor
+  const r = anchorEl.getBoundingClientRect();
+  Object.assign(pop.style, {
+    position: 'fixed',
+    top: (r.bottom + 6) + 'px',
+    left: Math.max(8, r.right - 220) + 'px',
+    zIndex: '40',
+  });
+  document.body.append(pop);
+  // Close on outside click
+  setTimeout(() => {
+    const dismiss = (e) => {
+      if (!pop.contains(e.target) && e.target !== anchorEl) {
+        pop.remove();
+        document.removeEventListener('mousedown', dismiss);
+      }
+    };
+    document.addEventListener('mousedown', dismiss);
+  }, 30);
+  inp.focus(); inp.select();
 }
 
 /* ============================================================
@@ -1916,13 +2518,18 @@ function openAddModal(prefill = {}) {
   for (const f of STATE.files) {
     for (const s of f.sheets) {
       if (!s.layout.dateISO) continue;
-      const filled = STATE.bookings.filter(b => b.fileKey === f.name && b.sheetName === s.sheetName)
+      const sm = getSheetMeta(f, s.sheetName);
+      // Cancelled & postponed bookings don't fill seats
+      const filled = STATE.bookings
+        .filter(b => b.fileKey === f.name && b.sheetName === s.sheetName && (b.status === 'active' || !b.status))
         .reduce((sm,b)=> sm + (b.adults||0) + (b.child||0), 0);
+      const effCap = sm.customCapacity != null ? sm.customCapacity : s.layout.capacity;
       slots.push({
         fileKey: f.name, sheetName: s.sheetName, color: f.excursionColor,
         excursionName: f.excursionName, dateISO: s.layout.dateISO,
-        capacity: s.layout.capacity, filled,
-        remaining: s.layout.capacity - filled,
+        capacity: effCap, filled,
+        remaining: effCap - filled,
+        activityCancelled: !!sm.activityCancelled,
       });
     }
   }
@@ -1937,6 +2544,11 @@ function openAddModal(prefill = {}) {
     helpEl.classList.remove('is-good','is-warn');
     if (!pickedExcursion || !pickedDate) { helpEl.textContent = 'Pick excursion and date to see availability.'; return; }
     if (!m) { helpEl.textContent = 'No sheet exists for this combination.'; return; }
+    if (m.activityCancelled) {
+      helpEl.classList.add('is-warn');
+      helpEl.textContent = `⚠ Activity is marked CANCELLED for this date. Adding anyway is allowed.`;
+      return;
+    }
     if (m.remaining <= 0) {
       helpEl.classList.add('is-warn');
       helpEl.textContent = `⚠ FULL (${m.filled}/${m.capacity}). Adding will overbook.`;
@@ -2088,8 +2700,9 @@ function openAddModal(prefill = {}) {
     const lay = sheetEntry.layout;
     let targetRow = -1;
     for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
-      const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, file.name, lay, r, file.excursionName, lay.dateISO, lay.capacity, file.excursionColor);
-      if (b.isEmpty) { targetRow = r; break; }
+      const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, file.name, lay, r, file.excursionName, lay.dateISO, lay.capacity, file.excursionColor, file);
+      // Skip rows that hold a cancellation/postpone log so the log isn't overwritten
+      if (b.isEmpty && (b.status === 'active' || !b.status)) { targetRow = r; break; }
     }
     if (targetRow < 0) {
       if (!confirm('All slots are taken. Overwrite the last slot?')) return;
@@ -2189,6 +2802,77 @@ function openEditModal(b) {
   adults.addEventListener('input', () => { adultsField.classList.remove('is-error'); childField.classList.remove('is-error'); });
   child.addEventListener('input',  () => { adultsField.classList.remove('is-error'); childField.classList.remove('is-error'); });
 
+  // ---------------------------------------------------------------
+  // Status banner (visible only if booking is cancelled or postponed)
+  // ---------------------------------------------------------------
+  const statusBanner = el('div', {class: 'status-banner', style: {display: 'none'}});
+  function refreshStatusBanner() {
+    statusBanner.innerHTML = '';
+    statusBanner.classList.remove('is-cancelled', 'is-postponed');
+    if (b.status === 'cancelled') {
+      statusBanner.classList.add('is-cancelled');
+      statusBanner.style.display = '';
+      const when = b.cancelledAt ? new Date(b.cancelledAt).toLocaleString() : '';
+      statusBanner.append(
+        el('div', {}, el('strong', {}, 'CANCELLED'), b.cancelReason ? ` — ${b.cancelReason}` : '', when ? ` · ${when}` : ''),
+        el('button', {class:'btn btn-small', onclick: () => doRestore()}, 'Restore'),
+      );
+    } else if (b.status === 'postponed') {
+      statusBanner.classList.add('is-postponed');
+      statusBanner.style.display = '';
+      statusBanner.append(
+        el('div', {}, el('strong', {}, 'POSTPONED'), b.postponedTo ? ` to ${fmtDateShort(b.postponedTo)}` : '', b.postponedRef ? ` (slot ${b.postponedRef})` : ''),
+        el('button', {class:'btn btn-small', onclick: () => doRestore()}, 'Restore'),
+      );
+    } else {
+      statusBanner.style.display = 'none';
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Attendance + payment controls
+  // ---------------------------------------------------------------
+  function makeSegmented(values, current, onChange) {
+    const wrap = el('div', {class:'seg-pills'});
+    const buttons = values.map(v => {
+      const btn = el('button', {
+        type: 'button',
+        class: 'seg-pill' + (v.value === current ? ' is-active' : ''),
+        onclick: () => {
+          buttons.forEach(b2 => b2.classList.remove('is-active'));
+          btn.classList.add('is-active');
+          onChange(v.value);
+        },
+      }, v.label);
+      return btn;
+    });
+    wrap.append(...buttons);
+    return wrap;
+  }
+
+  let attended = b.attended || 'pending';
+  let paid = b.paid || 'pending';
+  const attendedCtrl = makeSegmented(
+    [{value:'pending',label:'Pending'},{value:'yes',label:'Attended'},{value:'no',label:'No-show'}],
+    attended, v => { attended = v; }
+  );
+  const paidCtrl = makeSegmented(
+    [{value:'pending',label:'Unpaid'},{value:'yes',label:'Paid'},{value:'comp',label:'Comp'}],
+    paid, v => { paid = v; }
+  );
+
+  function doRestore() {
+    restoreBooking(file, b.sheetName, b.rowIdx);
+    b.status = 'active';
+    b.cancelReason = ''; b.cancelledAt = ''; b.postponedTo = ''; b.postponedRef = '';
+    toast('Booking restored', 'success');
+    refreshStatusBanner();
+    renderView();
+  }
+
+  // ---------------------------------------------------------------
+  // Save: persists row data + attendance/payment + paidAt
+  // ---------------------------------------------------------------
   const save = ()=>{
     roomField.classList.remove('is-error');
     adultsField.classList.remove('is-error');
@@ -2217,15 +2901,104 @@ function openEditModal(b) {
       liability: liability.value.trim(), billNo: billNo.value.trim(),
       remarks: remarks.value.trim(), staff: staff.value.trim(),
     });
+
+    // Persist meta changes (attendance / payment)
+    const metaPatch = { attended, paid };
+    if (paid === 'yes' && !b.paidAt) metaPatch.paidAt = nowISO();
+    if (paid !== 'yes') metaPatch.paidAt = '';
+    setBookingMeta(file, b.sheetName, b.rowIdx, metaPatch);
+    rebuildBookings();
+    updateStatus();
+
     toast('Booking updated', 'success');
     closeModal(); renderView();
   };
+
+  // ---------------------------------------------------------------
+  // Cancel-with-reason inline form
+  // ---------------------------------------------------------------
+  const cancelInline = el('div', {class: 'cancel-inline', style: {display: 'none'}});
+  const cancelReasonInput = el('textarea', {
+    class: 'cancel-reason',
+    placeholder: 'Reason (e.g. guest cancelled, payment failed, etc.)',
+    rows: '2',
+  });
+  cancelInline.append(
+    el('label', {}, 'Cancel reason'),
+    cancelReasonInput,
+    el('div', {class: 'cancel-inline-actions'},
+      el('button', {class:'btn', onclick: () => { cancelInline.style.display = 'none'; }}, 'Back'),
+      el('button', {class:'btn btn-danger', onclick: () => {
+        const reason = cancelReasonInput.value.trim();
+        cancelBookingSoft(file, b.sheetName, b.rowIdx, reason);
+        toast('Booking cancelled (kept as log)', 'success');
+        closeModal(); renderView();
+      }}, 'Confirm cancel'),
+    ),
+  );
   const cancel = ()=>{
-    if (!confirm(`Cancel ${b.guest || 'this'}'s booking on ${fmtDateShort(b.dateISO)}?`)) return;
-    clearBooking(file, b.sheetName, b.rowIdx);
-    toast('Booking cancelled', 'success');
-    closeModal(); renderView();
+    cancelInline.style.display = '';
+    setTimeout(() => cancelReasonInput.focus(), 30);
   };
+
+  // ---------------------------------------------------------------
+  // Postpone sub-modal
+  // ---------------------------------------------------------------
+  function openPostponeModal() {
+    const dateInput = el('input', {type:'date', value: b.dateISO || ''});
+    const modeMove = el('input', {type:'radio', name:'pp-mode', value:'move', checked: 'checked'});
+    const modeAnnotate = el('input', {type:'radio', name:'pp-mode', value:'annotate'});
+
+    // List sibling sheet dates for quick context
+    const otherDates = file ? file.sheets.map(s => s.layout.dateISO).filter(d => d && d !== b.dateISO) : [];
+    const datesNote = otherDates.length
+      ? el('div', {class:'field-help'}, `Other dates in this workbook: ${otherDates.slice(0,8).map(fmtDateShort).join(', ')}${otherDates.length>8?'…':''}`)
+      : el('div', {class:'field-help is-warn'}, 'No other dates in this workbook — only "Annotate" works.');
+
+    const node = el('div', {},
+      el('h2', {}, 'Postpone ', el('em', {}, 'booking')),
+      el('div', {class:'sub'}, `${b.guest || 'this booking'} · was ${fmtDateShort(b.dateISO)}`),
+      el('div', {class:'body'},
+        el('div', {class:'form-section'}, 'New date'),
+        el('div', {class:'field-row'},
+          el('div', {class:'field'}, el('label', {}, 'Postponed to'), dateInput),
+        ),
+        datesNote,
+        el('div', {class:'form-section'}, 'How to handle'),
+        el('label', {class:'radio-row'}, modeMove,
+          el('div', {},
+            el('strong', {}, 'Move to new sheet'),
+            el('div', {class:'sub'}, 'Cancel the original (kept as a log) and create a new active booking on the chosen date with the same details.')
+          )
+        ),
+        el('label', {class:'radio-row'}, modeAnnotate,
+          el('div', {},
+            el('strong', {}, 'Annotate only'),
+            el('div', {class:'sub'}, 'Mark this booking as postponed. Useful if the new date isn\'t known yet or is in another workbook.')
+          )
+        ),
+      ),
+      el('div', {class:'foot'},
+        el('button', {class:'btn', onclick: () => openEditModal(b)}, 'Back'),
+        el('div', {style:{flex:1}}),
+        el('button', {class:'btn btn-primary', onclick: () => {
+          const target = dateInput.value;
+          if (!target) { toast('Pick a new date', 'error'); return; }
+          const mode = modeMove.checked ? 'move' : 'annotate';
+          const res = postponeBooking(file, b.sheetName, b.rowIdx, target, mode, {
+            room: room.value.trim(), guest: guest.value.trim(),
+            departure: departure.value, adults: adults.value, child: child.value || 0,
+            liability: liability.value.trim(), billNo: billNo.value.trim(),
+            remarks: remarks.value.trim(), staff: staff.value.trim(),
+          });
+          if (!res.ok) { toast(res.error, 'error'); return; }
+          toast(mode === 'move' ? 'Booking moved' : 'Booking marked postponed', 'success');
+          closeModal(); renderView();
+        }}, 'Confirm postpone'),
+      )
+    );
+    openModal(node);
+  }
 
   const node = el('div', {},
     el('h2', {}, 'Edit ', el('em', {}, 'booking')),
@@ -2233,6 +3006,7 @@ function openEditModal(b) {
       el('span', {class:'swatch'}),
       el('span', {}, b.excursionName, ' · ', fmtDateLong(b.dateISO), ' · slot ', String(b.slot ?? '?'))
     ),
+    statusBanner,
     el('div', {class:'modal-legend'}, el('span', {class:'req'}, '•'), ' marks required fields.'),
     el('div', {class:'body'},
       el('div', {class:'form-section'}, 'Booking'),
@@ -2242,6 +3016,12 @@ function openEditModal(b) {
         childField,
       ),
       paxSummary,
+
+      el('div', {class:'form-section'}, 'Operations'),
+      el('div', {class:'op-row'},
+        el('div', {class:'op-cell'}, el('label', {}, 'Attendance'), attendedCtrl),
+        el('div', {class:'op-cell'}, el('label', {}, 'Payment'), paidCtrl),
+      ),
 
       el('div', {class:'form-section'}, 'Guest details'),
       el('div', {class:'field-row'},
@@ -2256,15 +3036,19 @@ function openEditModal(b) {
         el('div', {class:'field'}, el('label', {}, 'Staff'), staff),
         el('div', {class:'field'}, el('label', {}, 'Remarks'), remarks),
       ),
+
+      cancelInline,
     ),
     el('div', {class:'foot'},
       el('button', {class:'btn btn-danger', onclick:cancel}, 'Cancel booking'),
+      el('button', {class:'btn', onclick: openPostponeModal}, 'Postpone'),
       el('div', {style:{flex:1}}),
       el('button', {class:'btn', onclick:closeModal}, 'Close'),
       el('button', {class:'btn btn-primary', onclick:save}, 'Save'),
     )
   );
   openModal(node);
+  refreshStatusBanner();
   updatePaxSummary();
 }
 
@@ -2894,28 +3678,57 @@ function openInhouseModal() {
 function renderStats() {
   const wrap = el('div');
 
-  // Filter pool
-  let bs = STATE.bookings;
-  if (STATE.excFilter) bs = bs.filter(b => b.excursionName === STATE.excFilter);
+  // Filter pool — all bookings matching excursion filter (incl. cancelled/postponed,
+  // since some metrics need the full denominator).
+  let allInScope = STATE.bookings;
+  if (STATE.excFilter) allInScope = allInScope.filter(b => b.excursionName === STATE.excFilter);
+  const bsActive = allInScope.filter(b => b.status === 'active' || !b.status);
+  const bsCancelled = allInScope.filter(b => b.status === 'cancelled');
+  const bsPostponed = allInScope.filter(b => b.status === 'postponed');
 
-  // Headline numbers
-  const totalBookings = bs.length;
-  const totalAdults = bs.reduce((s,b)=>s+(b.adults||0),0);
-  const totalChild = bs.reduce((s,b)=>s+(b.child||0),0);
+  // For backwards-compat charts that operated over `bs`, use the active set.
+  const bs = bsActive;
+
+  // Headline numbers (active only)
+  const totalBookings = bsActive.length;
+  const totalAdults = bsActive.reduce((s,b)=>s+(b.adults||0),0);
+  const totalChild = bsActive.reduce((s,b)=>s+(b.child||0),0);
   const totalPax = totalAdults + totalChild;
-  const guestSet = new Set(bs.map(b => (b.guest||'').toUpperCase().trim()).filter(Boolean));
+  const guestSet = new Set(bsActive.map(b => (b.guest||'').toUpperCase().trim()).filter(Boolean));
 
-  // Capacity
-  let totalCap = 0, totalUsed = 0;
+  // Capacity (uses customCapacity override when set)
+  let totalCap = 0, totalUsed = 0, totalScheduledDays = 0, daysCancelled = 0;
+  const cancelByCat = { weather: 0, guests: 0, operational: 0, other: 0 };
   for (const f of STATE.files) for (const s of f.sheets) {
     if (STATE.excFilter && f.excursionName !== STATE.excFilter) continue;
     if (!s.layout.dateISO) continue;
-    totalCap += s.layout.capacity || 0;
+    totalScheduledDays += 1;
+    const sm = getSheetMeta(f, s.sheetName);
+    if (sm.activityCancelled) {
+      daysCancelled += 1;
+      const cat = sm.cancelReasonCat || 'other';
+      cancelByCat[cat] = (cancelByCat[cat] || 0) + 1;
+    }
+    const effCap = sm.customCapacity != null ? sm.customCapacity : (s.layout.capacity || 0);
+    totalCap += effCap;
     totalUsed += STATE.bookings
-      .filter(b => b.fileKey === f.name && b.sheetName === s.sheetName)
+      .filter(b => b.fileKey === f.name && b.sheetName === s.sheetName && (b.status === 'active' || !b.status))
       .reduce((sm,b)=>sm+(b.adults||0)+(b.child||0), 0);
   }
   const utilPct = totalCap ? Math.round(totalUsed/totalCap*100) : 0;
+
+  // No-show rate — only for past dates with attendance recorded
+  const today = todayISO();
+  const completedBookings = bsActive.filter(b => b.dateISO && b.dateISO < today && (b.attended === 'yes' || b.attended === 'no'));
+  const noShowCount = completedBookings.filter(b => b.attended === 'no').length;
+  const attendedCount = completedBookings.filter(b => b.attended === 'yes').length;
+  const noShowRate = completedBookings.length ? Math.round((noShowCount / completedBookings.length) * 100) : null;
+
+  // Outstanding payments — attended but not paid
+  const outstandingPayments = bsActive.filter(b => b.attended === 'yes' && b.paid === 'pending').length;
+  const cancelledCount = bsCancelled.length + bsPostponed.length;
+  const cancelledPct = (totalBookings + cancelledCount) ? Math.round((cancelledCount / (totalBookings + cancelledCount)) * 100) : 0;
+  const daysCancelledPct = totalScheduledDays ? Math.round((daysCancelled / totalScheduledDays) * 100) : 0;
 
   // Heading
   const heading = el('div', {class:'day-heading'},
@@ -2926,16 +3739,41 @@ function renderStats() {
   );
   wrap.append(heading);
 
-  // Stat cards
+  // Primary stat cards
   const stats = el('div', {class:'stats-grid'},
     statCard('Bookings', totalBookings, `${guestSet.size} unique guests`),
     statCard('Pax', totalPax, `${totalAdults} adults · ${totalChild} child`),
     statCard('Capacity used', utilPct + '%', `${totalUsed} of ${totalCap} seats`),
-    statCard('Days scheduled', uniqueScheduledDates().length, `${todayBookings()} booked today`),
+    statCard('Days scheduled', totalScheduledDays, `${todayBookings()} booked today`),
   );
   wrap.append(stats);
 
-  if (totalBookings === 0) {
+  // Operations stat cards (new)
+  const opsStats = el('div', {class:'stats-grid'},
+    statCard(
+      'No-show rate',
+      noShowRate == null ? '—' : (noShowRate + '%'),
+      noShowRate == null ? 'No completed bookings yet' : `${noShowCount} no-shows · ${attendedCount} attended`
+    ),
+    statCard(
+      'Cancelled bookings',
+      cancelledCount,
+      cancelledCount ? `${cancelledPct}% of total · ${bsPostponed.length} postponed` : 'No cancellations yet'
+    ),
+    statCard(
+      'Days cancelled',
+      daysCancelled,
+      daysCancelled ? `${daysCancelledPct}% of scheduled days` : 'No activity cancellations'
+    ),
+    statCard(
+      'Outstanding payments',
+      outstandingPayments,
+      outstandingPayments ? 'Attended but not yet paid' : 'All caught up'
+    ),
+  );
+  wrap.append(opsStats);
+
+  if (totalBookings === 0 && cancelledCount === 0 && daysCancelled === 0) {
     wrap.append(el('div', {class:'empty-state'},
       el('h3', {}, 'No bookings yet'),
       el('p', {}, 'Stats will appear here once bookings are added.')
@@ -2945,7 +3783,7 @@ function renderStats() {
 
   const grid = el('div', {class: 'dash-grid'});
 
-  // Excursion popularity
+  // Excursion popularity (active only)
   const byExc = {};
   for (const b of bs) {
     if (!byExc[b.excursionName]) byExc[b.excursionName] = {pax: 0, bookings: 0, color: b.excursionColor};
@@ -2956,13 +3794,58 @@ function renderStats() {
   const maxPax = excEntries.length ? excEntries[0][1].pax : 1;
   const excSec = el('div', {class:'dash-section'},
     el('h3', {}, 'Excursion popularity'),
-    el('div', {class:'bar-chart'},
-      ...excEntries.map(([name, data]) =>
-        barRow(name, data.pax, maxPax, `${data.pax} pax · ${data.bookings} bookings`, data.color)
+    excEntries.length === 0
+      ? el('div', {class:'dash-empty'}, 'No active bookings.')
+      : el('div', {class:'bar-chart'},
+        ...excEntries.map(([name, data]) =>
+          barRow(name, data.pax, maxPax, `${data.pax} pax · ${data.bookings} bookings`, data.color)
+        )
       )
-    )
   );
   grid.append(excSec);
+
+  // No-show rate by excursion (new)
+  const noShowByExc = {};
+  for (const b of bsActive) {
+    if (!b.dateISO || b.dateISO >= today) continue;
+    if (b.attended !== 'yes' && b.attended !== 'no') continue;
+    if (!noShowByExc[b.excursionName]) noShowByExc[b.excursionName] = { ns: 0, total: 0, color: b.excursionColor };
+    noShowByExc[b.excursionName].total += 1;
+    if (b.attended === 'no') noShowByExc[b.excursionName].ns += 1;
+  }
+  const noShowEntries = Object.entries(noShowByExc)
+    .map(([name, d]) => [name, { ...d, rate: d.total ? Math.round(d.ns / d.total * 100) : 0 }])
+    .sort((a,b) => b[1].rate - a[1].rate);
+  const noShowMax = 100;
+  const noShowSec = el('div', {class:'dash-section'},
+    el('h3', {}, 'No-show rate by excursion'),
+    noShowEntries.length === 0
+      ? el('div', {class:'dash-empty'}, 'No completed past-dated bookings with attendance recorded yet.')
+      : el('div', {class:'bar-chart'},
+        ...noShowEntries.map(([name, d]) =>
+          barRow(name, d.rate, noShowMax, `${d.rate}% · ${d.ns}/${d.total}`, '#A85A4A')
+        )
+      )
+  );
+  grid.append(noShowSec);
+
+  // Activity cancellations by reason (new)
+  const cancelTotal = Object.values(cancelByCat).reduce((s,n)=>s+n, 0);
+  const cancelLabels = { weather:'Weather', guests:'Guest cancellation', operational:'Operational', other:'Other' };
+  const cancelEntries = Object.entries(cancelByCat).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+  const cancelMax = cancelEntries.length ? cancelEntries[0][1] : 1;
+  const cancelColors = { weather:'#3D6975', guests:'#856437', operational:'#9C7A2C', other:'#7A4E3A' };
+  const cancelSec = el('div', {class:'dash-section'},
+    el('h3', {}, 'Activity cancellations by reason'),
+    cancelEntries.length === 0
+      ? el('div', {class:'dash-empty'}, `No activity cancellations${cancelTotal===0?'':' yet'}.`)
+      : el('div', {class:'bar-chart'},
+        ...cancelEntries.map(([cat, n]) =>
+          barRow(cancelLabels[cat] || cat, n, cancelMax, `${n} day${n>1?'s':''}`, cancelColors[cat] || '#7A4E3A')
+        )
+      )
+  );
+  grid.append(cancelSec);
 
   // Day-of-week distribution
   const dowCounts = [0,0,0,0,0,0,0]; // Mon..Sun
