@@ -2280,10 +2280,20 @@ function openEditModal(b) {
 function classifyInhouseHeader(text) {
   if (!text) return null;
   const t = String(text).trim();
-  if (/^room\b/i.test(t) || /^cabin\b/i.test(t) || /^rm\b/i.test(t) || /^r\.?no/i.test(t) || /^suite\b/i.test(t) || /room\s*(no|#|num)/i.test(t)) return 'room';
+  if (/^room\b/i.test(t) || /^cabin\b/i.test(t) || /^rm\b/i.test(t) || /^r\.?no/i.test(t) || /^suite\b/i.test(t) || /room\s*(no|#|num)/i.test(t) || /^villa\b/i.test(t) || /^bungalow\b/i.test(t) || /^unit\b/i.test(t) || /^apt\b/i.test(t) || /^apartment\b/i.test(t)) return 'room';
   if (/^name\b/i.test(t) || /guest\s*name/i.test(t) || /name\s*of\s*guest/i.test(t) || /^pax\s*name/i.test(t) || /^booker/i.test(t) || /^guest$/i.test(t) || /surname/i.test(t)) return 'name';
   if (/^arr(\.|ival)?\b/i.test(t) || /check.?in/i.test(t) || /arr(\.|ival)?\s*(date|dt)/i.test(t)) return 'arrival';
   if (/^dep(\.|arture)?\b/i.test(t) || /check.?out/i.test(t) || /dep(\.|arture)?\s*(date|dt)/i.test(t)) return 'departure';
+  // Recognise neighbouring columns so the column-range splitter has tighter
+  // boundaries — without these, "WPV" or "Travelzoo" leaks into the name/date
+  // columns and we end up with mangled records like "WPV MS. MINDY... US SHARER".
+  if (/^type\b/i.test(t) || /^category\b/i.test(t) || /^room\s*type/i.test(t) || /^villa\s*type/i.test(t)) return 'type';
+  if (/^ta\s*\/\s*comp/i.test(t) || /^ta\s+name/i.test(t) || /^ta\b/i.test(t) || /^agent\b/i.test(t) || /^company\b/i.test(t) || /^source\b/i.test(t)) return 'ta';
+  if (/^meal\b/i.test(t) || /meal\s*plan/i.test(t) || /^plan\b/i.test(t)) return 'meal';
+  if (/^rate\s*code/i.test(t) || /^rate\b/i.test(t)) return 'rate';
+  if (/^vip\b/i.test(t)) return 'vip';
+  if (/^nat\b/i.test(t) || /^nationality\b/i.test(t) || /^country\b/i.test(t)) return 'nat';
+  if (/^comments?\b/i.test(t) || /^notes?\b/i.test(t) || /^remarks?\b/i.test(t)) return 'comments';
   return null;
 }
 
@@ -2384,12 +2394,18 @@ function mergeAdjacentTokens(line) {
   if (!line || line.length < 2) return line;
   const sorted = [...line].sort((a, b) => a.x - b.x);
   const merged = [{...sorted[0]}];
+  const isDateLike = (t) => /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/.test(t) || /^\d{4}-\d{1,2}-\d{1,2}\b/.test(t);
   for (let i = 1; i < sorted.length; i++) {
     const prev = merged[merged.length - 1];
     const curr = sorted[i];
     const prevRight = prev.x + (prev.width || prev.text.length * 5);
     const gap = curr.x - prevRight;
-    if (gap <= 3) {
+    // Don't fold a date-like token into the previous one even when widths
+    // overlap: dates anchor their own column, and merging them into a long
+    // TA/agent name (e.g. "Hummingbird Travels") would destroy the
+    // arrival/departure values for that row.
+    const wouldEatDate = isDateLike(curr.text) && !isDateLike(prev.text);
+    if (gap <= 3 && !wouldEatDate) {
       prev.text = prev.text + (gap > 1 ? ' ' : '') + curr.text;
       prev.width = (curr.x + (curr.width || 0)) - prev.x;
     } else {
@@ -2528,11 +2544,19 @@ async function parseInhousePDF(file) {
 
         let arrival = parseFlexDate(rec.arrival);
         let departure = parseFlexDate(rec.departure);
+        // Defence in depth: if column extraction didn't yield clean dates
+        // (e.g. a wide TA cell still glued onto the date), scan every token
+        // in the line for embedded date substrings.
         if (!arrival || !departure) {
           const dates = [];
+          const dateRe = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{1,2}[\/\-\s\.][A-Za-z]{3,9}[\/\-\s\.,]\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/g;
           for (const tok of line) {
-            const iso = parseFlexDate(tok.text);
-            if (iso) dates.push(iso);
+            const matches = tok.text.match(dateRe);
+            if (!matches) continue;
+            for (const m of matches) {
+              const iso = parseFlexDate(m);
+              if (iso) dates.push(iso);
+            }
           }
           if (dates.length >= 2) {
             dates.sort();
@@ -2545,7 +2569,13 @@ async function parseInhousePDF(file) {
           }
         }
 
-        let name = (rec.name || '').trim().replace(/\s+/g, ' ').toUpperCase();
+        // Strip any date substrings the column splitter may have folded
+        // into the name (e.g. "MS. HAIFENG LU 01-05-26").
+        let name = (rec.name || '').trim()
+          .replace(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g, '')
+          .replace(/\s+/g, ' ')
+          .toUpperCase()
+          .trim();
         if (!name && !arrival && !departure) continue;
 
         guests.push({
