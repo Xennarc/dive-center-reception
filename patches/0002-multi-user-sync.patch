@@ -1,0 +1,596 @@
+diff --git a/Booking engine v4.html b/Booking engine v4.html
+index 9bd37aa..da16c40 100644
+--- a/Booking engine v4.html	
++++ b/Booking engine v4.html	
+@@ -1150,6 +1150,8 @@ const STATE = {
+   showCancelled: false,      // toggle: include cancelled/postponed in agenda lists
+   inhouseGuests: [],         // [{room, name, arrival, departure, property, businessDate, sourceFile}]
+   inhouseReports: [],        // [{filename, property, businessDate, guestCount, error?}]
++  userId: null,              // operator name; persisted at localStorage['reefdesk:userId']
++  saving: new Set(),         // filenames currently mid-save (poller skips these)
+ };
+ 
+ const PALETTE = ['#1B4965','#3D6975','#4A7C59','#856437','#A85A4A','#5E5081','#9C7A2C','#3A7866','#6B5070','#7A4E3A'];
+@@ -1450,7 +1452,7 @@ function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, date
+     paidAt: meta.paidAt,
+   };
+ }
+-function writeBooking(fileEntry, sheetName, rowIdx, fields) {
++function writeBooking(fileEntry, sheetName, rowIdx, fields, opts) {
+   const sheetEntry = fileEntry.sheets.find(s => s.sheetName === sheetName);
+   if (!sheetEntry) return false;
+   const ws = sheetEntry.ws;
+@@ -1470,7 +1472,15 @@ function writeBooking(fileEntry, sheetName, rowIdx, fields) {
+   setCell(layout.remarks, fields.remarks);
+   setCell(layout.staff, fields.staff);
+   fileEntry.dirty = true;
+-  rebuildBookings();
++  recordOp(fileEntry, {
++    kind: 'writeBooking',
++    sheetName, rowIdx,
++    fields: { ...fields },
++    isNew: !!(opts && opts.isNew),
++    bookingTempId: opts && opts.bookingTempId || undefined,
++    txnId: opts && opts.txnId || undefined,
++  });
++  if (!replaying) rebuildBookings();
+   updateStatus();
+   return true;
+ }
+@@ -1510,12 +1520,13 @@ function restoreBooking(fileEntry, sheetName, rowIdx) {
+    { ok, newId? , error? }. */
+ function postponeBooking(fileEntry, sheetName, rowIdx, newDateISO, mode, sourceFields) {
+   if (!newDateISO) return { ok: false, error: 'No target date' };
++  const txnId = 'txn-' + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(36).slice(2));
+   if (mode === 'annotate') {
+     setBookingMeta(fileEntry, sheetName, rowIdx, {
+       status: 'postponed',
+       postponedTo: newDateISO,
+       cancelledAt: nowISO(),
+-    });
++    }, { txnId });
+     rebuildBookings();
+     updateStatus();
+     return { ok: true };
+@@ -1546,14 +1557,14 @@ function postponeBooking(fileEntry, sheetName, rowIdx, newDateISO, mode, sourceF
+     billNo: sourceFields.billNo || null,
+     remarks: (sourceFields.remarks ? sourceFields.remarks + ' · ' : '') + `(postponed from ${sheetName})`,
+     staff: sourceFields.staff || null,
+-  });
++  }, { txnId });
+   // Mark the original as postponed with backref
+   setBookingMeta(fileEntry, sheetName, rowIdx, {
+     status: 'postponed',
+     postponedTo: newDateISO,
+     postponedRef: `${targetSheet.sheetName}::${targetRow}`,
+     cancelledAt: nowISO(),
+-  });
++  }, { txnId });
+   rebuildBookings();
+   updateStatus();
+   return { ok: true, newSheet: targetSheet.sheetName, newRow: targetRow };
+@@ -1718,7 +1729,7 @@ function getBookingMeta(fileEntry, sheetName, rowIdx) {
+   return { ...BOOKING_META_DEFAULTS, ...stored };
+ }
+ 
+-function setBookingMeta(fileEntry, sheetName, rowIdx, partial) {
++function setBookingMeta(fileEntry, sheetName, rowIdx, partial, opts) {
+   if (!fileEntry.bookingMeta) fileEntry.bookingMeta = new Map();
+   const key = `${sheetName}::${rowIdx}`;
+   const existing = fileEntry.bookingMeta.get(key) || {};
+@@ -1734,6 +1745,13 @@ function setBookingMeta(fileEntry, sheetName, rowIdx, partial) {
+   if (!meaningful) fileEntry.bookingMeta.delete(key);
+   else fileEntry.bookingMeta.set(key, merged);
+   fileEntry.dirty = true;
++  recordOp(fileEntry, {
++    kind: 'setBookingMeta',
++    sheetName, rowIdx,
++    partial: { ...partial },
++    bookingTempId: opts && opts.bookingTempId || undefined,
++    txnId: opts && opts.txnId || undefined,
++  });
+ }
+ 
+ function getSheetMeta(fileEntry, sheetName) {
+@@ -1741,7 +1759,7 @@ function getSheetMeta(fileEntry, sheetName) {
+   return { ...SHEET_META_DEFAULTS, ...stored };
+ }
+ 
+-function setSheetMeta(fileEntry, sheetName, partial) {
++function setSheetMeta(fileEntry, sheetName, partial, opts) {
+   if (!fileEntry.sheetMeta) fileEntry.sheetMeta = new Map();
+   const existing = fileEntry.sheetMeta.get(sheetName) || {};
+   const merged = { ...existing, ...partial };
+@@ -1754,6 +1772,12 @@ function setSheetMeta(fileEntry, sheetName, partial) {
+   if (!meaningful) fileEntry.sheetMeta.delete(sheetName);
+   else fileEntry.sheetMeta.set(sheetName, merged);
+   fileEntry.dirty = true;
++  recordOp(fileEntry, {
++    kind: 'setSheetMeta',
++    sheetName,
++    partial: { ...partial },
++    txnId: opts && opts.txnId || undefined,
++  });
+ }
+ function toDeparture(s) {
+   if (!s) return null;
+@@ -1784,12 +1808,21 @@ async function loadFiles(fileSpecs){
+         if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
+       });
+       const { bookingMeta, sheetMeta } = readMetaSheets(wb);
++      let lastSyncedMtime = 0;
++      if (spec.fileHandle && spec.fileHandle.getFile) {
++        try { lastSyncedMtime = (await spec.fileHandle.getFile()).lastModified || 0; } catch (_) {}
++      } else if (spec.fileObj && spec.fileObj.lastModified) {
++        lastSyncedMtime = spec.fileObj.lastModified;
++      }
+       STATE.files.push({
+         name: spec.name,
+         fileHandle: spec.fileHandle || null,
+         fileObj: spec.fileObj || null,
+         wb, sheets, dirty: false,
+         bookingMeta, sheetMeta,
++        lastSyncedMtime,
++        pendingOps: [],
++        remoteChanged: false,
+       });
+     } catch (err) {
+       console.error('load failed', spec.name, err);
+@@ -1806,6 +1839,32 @@ async function loadFiles(fileSpecs){
+   STATE.excursions = Array.from(excSeen.values());
+   rebuildBookings();
+ }
++/**
++ * Re-read a single file's bytes from disk and rebuild its workbook/sheets/meta in place.
++ * Used by both `loadFiles` (no — kept inline there for fresh-load semantics) and the
++ * background sync poller. Deliberately does NOT touch view state on STATE
++ * (selectedDate / search / view / excFilter / showCancelled).
++ */
++async function reloadFile(fileEntry){
++  if (!fileEntry || !fileEntry.fileHandle || !fileEntry.fileHandle.getFile) return;
++  const file = await fileEntry.fileHandle.getFile();
++  const buf = await file.arrayBuffer();
++  const wb = new ExcelJS.Workbook();
++  await wb.xlsx.load(buf);
++  const sheets = [];
++  wb.eachSheet((ws) => {
++    if (META_SHEET_NAMES.includes(ws.name)) return;
++    const lay = detectLayout(ws);
++    if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
++  });
++  const { bookingMeta, sheetMeta } = readMetaSheets(wb);
++  fileEntry.wb = wb;
++  fileEntry.sheets = sheets;
++  fileEntry.bookingMeta = bookingMeta;
++  fileEntry.sheetMeta = sheetMeta;
++  fileEntry.lastSyncedMtime = file.lastModified || 0;
++  rebuildBookings();
++}
+ function rebuildBookings(){
+   const out = [];
+   for (const f of STATE.files) {
+@@ -1830,29 +1889,67 @@ async function saveAll() {
+   if (!dirtyFiles.length) { toast('Nothing to save'); return; }
+   let saved = 0;
+   for (const f of dirtyFiles) {
++    STATE.saving.add(f.name);
++    let lockHandle = null;
+     try {
+-      flushMetaSheets(f);
+-      const buf = await f.wb.xlsx.writeBuffer();
++      // Snapshot the op log BEFORE any await so ops queued during save survive.
++      const ops = (f.pendingOps || []).slice();
++      const opCount = ops.length;
++
+       if (STATE.mode === 'fs' && f.fileHandle) {
++        // Acquire cooperative lock against peers in the shared folder.
++        lockHandle = await acquireLock(f.name);
++        if (!lockHandle) {
++          toast(`Couldn't save ${f.name} — another user is editing`, 'error');
++          continue;
++        }
++
++        // Conflict detection: re-stat lastModified against our last known.
++        let mtimeNow = 0;
++        try { mtimeNow = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) {}
++        if (mtimeNow && f.lastSyncedMtime && mtimeNow !== f.lastSyncedMtime) {
++          // Disk has moved on — reload then replay our ops on top.
++          await reloadFile(f);
++          await replayOps(f, ops);
++        }
++
++        flushMetaSheets(f);
++        const buf = await f.wb.xlsx.writeBuffer();
+         const w = await f.fileHandle.createWritable();
+         await w.write(buf);
+         await w.close();
++        // Re-stat AFTER close so we know the disk mtime we just produced.
++        try { f.lastSyncedMtime = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) {}
+       } else {
++        // 'fp' mode — manual file picker, sync is silently disabled.
++        flushMetaSheets(f);
++        const buf = await f.wb.xlsx.writeBuffer();
+         const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+         const url = URL.createObjectURL(blob);
+         const a = document.createElement('a');
+         a.href = url; a.download = f.name; a.click();
+         URL.revokeObjectURL(url);
+       }
+-      f.dirty = false;
++
++      // Splice the snapshotted prefix off pendingOps — preserves ops queued
++      // during the awaits above. Don't reassign `[]`.
++      if (f.pendingOps && opCount) f.pendingOps.splice(0, opCount);
++      f.dirty = !!(f.pendingOps && f.pendingOps.length > 0);
++      f.remoteChanged = false;
+       saved++;
+     } catch (err) {
+       console.error(err);
+       toast(`Failed to save ${f.name}: ${err.message}`, 'error');
++    } finally {
++      if (lockHandle) {
++        try { await releaseLock(lockHandle); } catch (e) { console.warn('lock release', e); }
++      }
++      STATE.saving.delete(f.name);
+     }
+   }
+   if (saved) toast(`Saved ${saved} file${saved>1?'s':''}`, 'success');
+   updateStatus();
++  renderView();
+ }
+ async function reload() {
+   if (STATE.mode === 'fs' && STATE.dirHandle) {
+@@ -1866,6 +1963,287 @@ async function reload() {
+   }
+ }
+ 
++/* ============================================================
++   Sync (multi-user)
++   - Op-log: every booking/meta mutation appends a structured op to the
++     file's pendingOps. On save we re-stat the disk; if it's moved on,
++     we reload and replay our ops on top. New-booking ops get reallocated
++     to the next free row when their original target is now occupied.
++   - Cooperative lock: a `~$<filename>.savelock.<sessionId>` file in the
++     shared folder gates concurrent writers. Stale locks (mtime > 30s)
++     are ignored. The smallest sessionId among non-stale candidates wins.
++   - Background poll: every 8s we re-stat each file. If it's newer than
++     our `lastSyncedMtime` and we're not locally dirty, we silently
++     reload. If we ARE dirty, we set `remoteChanged` so the next save
++     takes the conflict path.
++   - 'fp' (manual file picker) mode is a no-op for all sync code paths.
++   ============================================================ */
++
++// Per-tab session id, generated once when the workspace is shown. Used to
++// distinguish our own lock candidates from peers'.
++let SESSION_ID = null;
++
++// When true, recordOp + writeBooking's sync rebuildBookings are suppressed.
++// Set during conflict-replay so we mutate the freshly-loaded workbook in
++// place without recursive op recording.
++let replaying = false;
++
++// Background poller interval id.
++let _pollTimer = null;
++
++function _uuid() {
++  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
++  return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
++}
++
++function recordOp(fileEntry, op) {
++  if (replaying) return;
++  if (!fileEntry.pendingOps) fileEntry.pendingOps = [];
++  fileEntry.pendingOps.push(op);
++}
++
++/**
++ * Replay an op-log onto a freshly-reloaded workbook. Called from saveAll
++ * when the on-disk mtime has moved past our last-synced value. Groups
++ * ops by txnId so multi-op operations (postpone) stay atomic, and
++ * reallocates new-booking rows that are now occupied. Skipped ops
++ * (sheet vanished) are collected and surfaced as a single toast.
++ */
++async function replayOps(fileEntry, ops) {
++  const tempIdToRow = new Map(); // bookingTempId -> resolved rowIdx
++  const skipped = [];
++  replaying = true;
++  try {
++    for (const op of ops) {
++      const sheetEntry = fileEntry.sheets.find(s => s.sheetName === op.sheetName);
++      if (!sheetEntry) { skipped.push(op); continue; }
++
++      if (op.kind === 'writeBooking') {
++        let row = op.rowIdx;
++        if (op.isNew) {
++          // Re-scan empty rows; if our intendedRow is taken, allocate the next.
++          const lay = sheetEntry.layout;
++          let chosen = -1;
++          for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
++            const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, fileEntry.name, lay, r,
++              fileEntry.excursionName, lay.dateISO, lay.capacity, fileEntry.excursionColor, fileEntry);
++            const m = getBookingMeta(fileEntry, sheetEntry.sheetName, r);
++            if (b.isEmpty && (m.status === 'active' || !m.status)) { chosen = r; break; }
++          }
++          if (chosen < 0) { skipped.push(op); continue; }
++          row = chosen;
++          if (op.bookingTempId) tempIdToRow.set(op.bookingTempId, row);
++        } else if (op.bookingTempId && tempIdToRow.has(op.bookingTempId)) {
++          row = tempIdToRow.get(op.bookingTempId);
++        }
++        writeBooking(fileEntry, op.sheetName, row, op.fields, {
++          isNew: op.isNew, bookingTempId: op.bookingTempId, txnId: op.txnId,
++        });
++      } else if (op.kind === 'setBookingMeta') {
++        let row = op.rowIdx;
++        if (op.bookingTempId && tempIdToRow.has(op.bookingTempId)) {
++          row = tempIdToRow.get(op.bookingTempId);
++        }
++        setBookingMeta(fileEntry, op.sheetName, row, op.partial, { txnId: op.txnId });
++      } else if (op.kind === 'setSheetMeta') {
++        setSheetMeta(fileEntry, op.sheetName, op.partial, { txnId: op.txnId });
++      }
++    }
++  } finally {
++    replaying = false;
++  }
++  // After replay, refresh in-memory bookings (suppressed during the loop).
++  rebuildBookings();
++  if (skipped.length) {
++    toast(`${skipped.length} change${skipped.length>1?'s':''} dropped during merge — sheet missing or full`, 'error');
++  }
++}
++
++/* ---------- Lock protocol ---------- */
++
++function _lockName(fileName, sessionId) {
++  return `~$${fileName}.savelock.${sessionId}`;
++}
++function _lockPrefix(fileName) {
++  return `~$${fileName}.savelock.`;
++}
++
++async function _writeLockFile(handle, body) {
++  const w = await handle.createWritable();
++  await w.write(JSON.stringify(body));
++  await w.close();
++}
++
++async function acquireLock(fileName) {
++  if (STATE.mode !== 'fs' || !STATE.dirHandle) return null;
++  const sessionId = SESSION_ID;
++  if (!sessionId) return null;
++  const candidateName = _lockName(fileName, sessionId);
++
++  for (let attempt = 0; attempt < 5; attempt++) {
++    let candidateHandle = null;
++    try {
++      candidateHandle = await STATE.dirHandle.getFileHandle(candidateName, { create: true });
++      await _writeLockFile(candidateHandle, {
++        userId: STATE.userId || 'unknown',
++        sessionId,
++        ts: Date.now(),
++      });
++    } catch (e) {
++      console.warn('lock candidate write failed', e);
++      // back off and retry
++      await _sleep(_jitter(500, 2000));
++      continue;
++    }
++
++    // List all candidates for this file in the dir, drop stale ones.
++    const prefix = _lockPrefix(fileName);
++    const live = [];
++    try {
++      for await (const [name, h] of STATE.dirHandle.entries()) {
++        if (h.kind !== 'file' || !name.startsWith(prefix)) continue;
++        let mtime = 0;
++        try { mtime = (await h.getFile()).lastModified || 0; } catch (_) {}
++        const isStale = mtime > 0 && (Date.now() - mtime) > 30000;
++        if (isStale) {
++          // Best-effort cleanup of stale locks
++          try { await STATE.dirHandle.removeEntry(name); } catch (_) {}
++          continue;
++        }
++        const sid = name.slice(prefix.length);
++        live.push({ name, sid, handle: h });
++      }
++    } catch (e) {
++      console.warn('lock list failed', e);
++      try { await STATE.dirHandle.removeEntry(candidateName); } catch (_) {}
++      await _sleep(_jitter(500, 2000));
++      continue;
++    }
++
++    // Smallest non-stale sessionId wins.
++    live.sort((a, b) => a.sid < b.sid ? -1 : a.sid > b.sid ? 1 : 0);
++    const winner = live[0];
++    if (winner && winner.sid === sessionId) {
++      // We hold the lock. Start a heartbeat so our mtime stays fresh.
++      const heartbeat = setInterval(() => {
++        _writeLockFile(candidateHandle, {
++          userId: STATE.userId || 'unknown',
++          sessionId,
++          ts: Date.now(),
++        }).catch((e) => console.warn('lock heartbeat', e));
++      }, 10000);
++      return { fileName, candidateName, candidateHandle, heartbeat };
++    }
++
++    // Someone else is ahead of us. Drop our candidate, jittered backoff, retry.
++    try { await STATE.dirHandle.removeEntry(candidateName); } catch (_) {}
++    await _sleep(_jitter(500, 2000));
++  }
++  return null;
++}
++
++async function releaseLock(lock) {
++  if (!lock) return;
++  if (lock.heartbeat) clearInterval(lock.heartbeat);
++  try { await STATE.dirHandle.removeEntry(lock.candidateName); } catch (e) { console.warn('lock remove', e); }
++}
++
++function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
++function _jitter(min, max) { return Math.floor(min + Math.random() * (max - min)); }
++
++/* ---------- Background poll ---------- */
++
++async function pollExternalChanges() {
++  if (STATE.mode !== 'fs' || !STATE.dirHandle) return;
++  if (document.hidden) return;
++  // Permission can downgrade after OS sleep; abort tick silently if so.
++  try {
++    const perm = await STATE.dirHandle.queryPermission({ mode: 'readwrite' });
++    if (perm !== 'granted') return;
++  } catch (_) { return; }
++
++  let anyReloaded = false;
++  let dirtyRemoteSeen = false;
++  for (const f of STATE.files) {
++    if (!f.fileHandle || !f.fileHandle.getFile) continue;
++    if (STATE.saving.has(f.name)) continue;
++    let mtime = 0;
++    try { mtime = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) { continue; }
++    if (mtime <= (f.lastSyncedMtime || 0)) continue;
++
++    if (!f.dirty) {
++      try {
++        await reloadFile(f);
++        toast(`Updated ${f.name}`);
++        anyReloaded = true;
++      } catch (e) {
++        console.warn('poll reload failed', f.name, e);
++      }
++    } else {
++      f.remoteChanged = true;
++      dirtyRemoteSeen = true;
++    }
++  }
++  if (anyReloaded) {
++    renderView();
++    renderDateStrip();
++    updateStatus();
++  } else if (dirtyRemoteSeen) {
++    updateStatus();
++  }
++}
++
++function startPoller() {
++  if (STATE.mode !== 'fs') return;
++  if (_pollTimer) return;
++  _pollTimer = setInterval(() => { pollExternalChanges().catch(e => console.warn('poll', e)); }, 8000);
++}
++
++function stopPoller() {
++  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
++}
++
++/* ---------- User-id bootstrap ---------- */
++
++function loadUserId() {
++  try {
++    const v = localStorage.getItem('reefdesk:userId');
++    if (v) STATE.userId = v;
++  } catch (_) {}
++}
++
++function promptForUserId() {
++  return new Promise((resolve) => {
++    const input = el('input', { type: 'text', placeholder: 'e.g. Maya', maxlength: 40, style: { width: '100%' } });
++    const submit = () => {
++      const v = (input.value || '').trim();
++      if (!v) { input.focus(); return; }
++      try { localStorage.setItem('reefdesk:userId', v); } catch (_) {}
++      STATE.userId = v;
++      closeModal();
++      resolve(v);
++    };
++    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
++    const node = el('div', {},
++      el('h2', {}, 'Who\'s ', el('em', {}, 'editing')),
++      el('div', { class: 'sub' }, 'Reef Desk tags your edits with a name so other users see who saved what. Stored in this browser only.'),
++      el('div', { class: 'body' },
++        el('div', { class: 'field' }, el('label', {}, 'Your name'), input),
++      ),
++      el('div', { class: 'actions' },
++        el('button', { class: 'btn btn-primary', onclick: submit }, 'Continue'),
++      ),
++    );
++    openModal(node);
++    setTimeout(() => input.focus(), 30);
++  });
++}
++
++async function ensureUserId() {
++  loadUserId();
++  if (!STATE.userId) await promptForUserId();
++}
++
+ /* ============================================================
+    File source
+    ============================================================ */
+@@ -1942,6 +2320,12 @@ function showWorkspace(){
+   updateStatus();
+   renderDateStrip();
+   renderView();
++
++  // Sync bootstrap: assign a per-tab session id, prompt for userId if needed,
++  // and start the background poller (silently no-ops in 'fp' mode).
++  if (!SESSION_ID) SESSION_ID = _uuid();
++  ensureUserId().catch(e => console.warn('userId bootstrap', e));
++  startPoller();
+ }
+ 
+ function uniqueDates() {
+@@ -1954,11 +2338,12 @@ function uniqueDates() {
+ 
+ function updateStatus(){
+   const dirty = STATE.files.some(f=>f.dirty);
++  const remoteChanged = STATE.files.some(f => f.remoteChanged);
+   const pill = $('#status-pill'), txt = $('#status-text');
+   pill.classList.toggle('is-dirty', dirty);
+   if (dirty) {
+     const n = STATE.files.filter(f=>f.dirty).length;
+-    txt.textContent = `${n} unsaved`;
++    txt.textContent = `${n} unsaved${remoteChanged ? ' • remote changes' : ''}`;
+   } else {
+     txt.textContent = `${STATE.files.length} file${STATE.files.length>1?'s':''}`;
+   }
+@@ -2708,12 +3093,17 @@ function openAddModal(prefill = {}) {
+       if (!confirm('All slots are taken. Overwrite the last slot?')) return;
+       targetRow = lay.lastBooking;
+     }
++    // Sync: tag this new booking with a temp id so a conflict-replay can
++    // reallocate the row if a peer claimed `targetRow` first, and so any
++    // subsequent meta ops (cancel/postpone in the same modal session) can
++    // ride on the same booking once it gets a stable rowIdx.
++    const bookingTempId = 'tmp-' + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(36).slice(2));
+     writeBooking(file, sheetEntry.sheetName, targetRow, {
+       room: room.value.trim(), guest: guest.value.trim(),
+       departure: departure.value, adults: adults.value, child: child.value || 0,
+       liability: liability.value.trim(), billNo: billNo.value.trim(),
+       remarks: remarks.value.trim(), staff: staff.value.trim(),
+-    });
++    }, { isNew: true, bookingTempId });
+     toast('Booking added', 'success');
+     closeModal();
+     renderDateStrip(); renderView();
+@@ -4033,8 +4423,19 @@ window.addEventListener('keydown', e => {
+   }
+ });
+ window.addEventListener('beforeunload', e=>{
++  stopPoller();
+   if (STATE.files.some(f=>f.dirty)) { e.preventDefault(); e.returnValue = ''; }
+ });
++document.addEventListener('visibilitychange', () => {
++  // pollExternalChanges already short-circuits when document.hidden, but
++  // also explicitly tear down/spin up the timer so we don't fire wakeups
++  // while the tab is in the background.
++  if (document.hidden) {
++    stopPoller();
++  } else if (STATE.mode === 'fs' && STATE.dirHandle) {
++    startPoller();
++  }
++});
+ 
+ if (!('showDirectoryPicker' in window)) {
+   $('#btn-open-folder').style.display = 'none';
