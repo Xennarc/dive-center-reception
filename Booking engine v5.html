@@ -1920,12 +1920,10 @@ async function saveAll() {
       const opCount = ops.length;
 
       if (STATE.mode === 'fs' && f.fileHandle) {
-        // Acquire cooperative lock against peers in the shared folder.
+        // Best-effort cooperative lock. If we can't get it (peer mid-save,
+        // leftover lockfile from a crashed tab, slow share), proceed anyway —
+        // the mtime check + replayOps below is the real safety net.
         lockHandle = await acquireLock(f.name);
-        if (!lockHandle) {
-          toast(`Couldn't save ${f.name} — another user is editing`, 'error');
-          continue;
-        }
 
         // Conflict detection: re-stat lastModified against our last known.
         // If the cached handle has gone stale (file replaced externally),
@@ -2192,7 +2190,7 @@ async function acquireLock(fileName) {
         if (h.kind !== 'file' || !name.startsWith(prefix)) continue;
         let mtime = 0;
         try { mtime = (await h.getFile()).lastModified || 0; } catch (_) {}
-        const isStale = mtime > 0 && (Date.now() - mtime) > 30000;
+        const isStale = mtime > 0 && (Date.now() - mtime) > 12000;
         if (isStale) {
           // Best-effort cleanup of stale locks
           try { await STATE.dirHandle.removeEntry(name); } catch (_) {}
@@ -2351,7 +2349,19 @@ async function openDirectory(handle) {
   STATE.mode = 'fs';
   const specs = [];
   for await (const [name, h] of handle.entries()) {
-    if (h.kind === 'file' && /\.xlsx$/i.test(name) && !/^~\$/.test(name)) {
+    if (h.kind !== 'file') continue;
+    // Sweep leftover savelocks from crashed tabs so saves aren't blocked
+    // by ghost holders. Live holders heartbeat every 10s; 12s is safe.
+    if (/^~\$.+\.savelock\./.test(name)) {
+      try {
+        const mtime = (await h.getFile()).lastModified || 0;
+        if (mtime > 0 && (Date.now() - mtime) > 12000) {
+          await handle.removeEntry(name);
+        }
+      } catch (_) {}
+      continue;
+    }
+    if (/\.xlsx$/i.test(name) && !/^~\$/.test(name)) {
       specs.push({
         name, fileHandle: h,
         getBytes: async () => new Uint8Array(await (await h.getFile()).arrayBuffer()),
