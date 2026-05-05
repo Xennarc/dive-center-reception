@@ -1847,7 +1847,17 @@ async function loadFiles(fileSpecs){
  */
 async function reloadFile(fileEntry){
   if (!fileEntry || !fileEntry.fileHandle || !fileEntry.fileHandle.getFile) return;
-  const file = await fileEntry.fileHandle.getFile();
+  let file;
+  try {
+    file = await fileEntry.fileHandle.getFile();
+  } catch (e) {
+    // Cached handle may be pinned to a replaced directory entry; refresh once.
+    if (await resolveFileHandle(fileEntry)) {
+      file = await fileEntry.fileHandle.getFile();
+    } else {
+      throw e;
+    }
+  }
   const buf = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
@@ -1887,6 +1897,19 @@ function rebuildBookings(){
 async function saveAll() {
   const dirtyFiles = STATE.files.filter(f => f.dirty);
   if (!dirtyFiles.length) { toast('Nothing to save'); return; }
+
+  // Folder permission can downgrade after OS sleep — re-check before saving.
+  // Cmd+S / the Save button is a user gesture, so requestPermission() is allowed.
+  if (STATE.mode === 'fs' && STATE.dirHandle) {
+    try {
+      let perm = await STATE.dirHandle.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') perm = await STATE.dirHandle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') { toast('Folder access expired — please re-grant.', 'error'); return; }
+    } catch (e) {
+      console.warn('permission requery', e);
+    }
+  }
+
   let saved = 0;
   for (const f of dirtyFiles) {
     STATE.saving.add(f.name);
@@ -1905,21 +1928,60 @@ async function saveAll() {
         }
 
         // Conflict detection: re-stat lastModified against our last known.
+        // If the cached handle has gone stale (file replaced externally),
+        // re-resolve from the directory and try once more.
         let mtimeNow = 0;
-        try { mtimeNow = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) {}
+        try {
+          mtimeNow = (await f.fileHandle.getFile()).lastModified || 0;
+        } catch (_) {
+          if (await resolveFileHandle(f)) {
+            try { mtimeNow = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) {}
+          }
+        }
         if (mtimeNow && f.lastSyncedMtime && mtimeNow !== f.lastSyncedMtime) {
           // Disk has moved on — reload then replay our ops on top.
           await reloadFile(f);
-          await replayOps(f, ops);
+          try {
+            await replayOps(f, ops);
+          } catch (e) {
+            console.error('replayOps failed', e);
+            toast(`External edits to ${f.name} conflict with your changes — please reload`, 'error');
+            continue;
+          }
         }
 
         flushMetaSheets(f);
         const buf = await f.wb.xlsx.writeBuffer();
-        const w = await f.fileHandle.createWritable();
-        await w.write(buf);
-        await w.close();
+        // createWritable can throw if the underlying file was renamed/replaced
+        // (NotFoundError) or is held by another process (NotAllowedError).
+        // Re-resolve once on NotFoundError and retry; tag lock-style errors so
+        // the catch below can show an actionable toast.
+        const doWrite = async () => {
+          const w = await f.fileHandle.createWritable();
+          await w.write(buf);
+          await w.close();
+        };
+        try {
+          await doWrite();
+        } catch (err) {
+          if (err && err.name === 'NotFoundError' && await resolveFileHandle(f)) {
+            await doWrite();
+          } else {
+            const msg = String((err && err.message) || '').toLowerCase();
+            if (err && (err.name === 'NotAllowedError' || /lock|in use|sharing|busy/.test(msg))) {
+              err._reefLock = true;
+            }
+            throw err;
+          }
+        }
         // Re-stat AFTER close so we know the disk mtime we just produced.
-        try { f.lastSyncedMtime = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) {}
+        // If even this throws, refresh the handle so the next save sees a live one.
+        try {
+          f.lastSyncedMtime = (await f.fileHandle.getFile()).lastModified || 0;
+        } catch (_) {
+          await resolveFileHandle(f);
+          try { f.lastSyncedMtime = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) {}
+        }
       } else {
         // 'fp' mode — manual file picker, sync is silently disabled.
         flushMetaSheets(f);
@@ -1939,7 +2001,15 @@ async function saveAll() {
       saved++;
     } catch (err) {
       console.error(err);
-      toast(`Failed to save ${f.name}: ${err.message}`, 'error');
+      if (err && (err._reefLock || err.name === 'NotAllowedError')) {
+        toast(`Couldn't save ${f.name} — it's open in Excel/LibreOffice. Close the file and press Cmd+S again.`, 'error');
+      } else if (err && err.name === 'NotFoundError') {
+        toast(`${f.name} was replaced on disk — try saving again.`, 'error');
+      } else if (err && err.name === 'SecurityError') {
+        toast('Folder access expired — please re-grant.', 'error');
+      } else {
+        toast(`Failed to save ${f.name}: ${err.message}`, 'error');
+      }
     } finally {
       if (lockHandle) {
         try { await releaseLock(lockHandle); } catch (e) { console.warn('lock release', e); }
@@ -2059,6 +2129,24 @@ async function replayOps(fileEntry, ops) {
   }
 }
 
+/* ---------- File-handle re-resolution ---------- */
+
+// Re-fetch this file's FileSystemFileHandle from STATE.dirHandle. When an
+// external program (Excel/LibreOffice) saves over the file via atomic
+// write-rename, the handle we cached at load time can stick to a dead
+// directory entry — getFile() / createWritable() then throw indefinitely.
+// Call this after a handle-bound call throws to recover for the next attempt.
+async function resolveFileHandle(f) {
+  if (STATE.mode !== 'fs' || !STATE.dirHandle) return false;
+  try {
+    f.fileHandle = await STATE.dirHandle.getFileHandle(f.name);
+    return true;
+  } catch (e) {
+    console.warn('resolveFileHandle', f.name, e);
+    return false;
+  }
+}
+
 /* ---------- Lock protocol ---------- */
 
 function _lockName(fileName, sessionId) {
@@ -2168,7 +2256,18 @@ async function pollExternalChanges() {
     if (!f.fileHandle || !f.fileHandle.getFile) continue;
     if (STATE.saving.has(f.name)) continue;
     let mtime = 0;
-    try { mtime = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) { continue; }
+    let statOk = true;
+    try {
+      mtime = (await f.fileHandle.getFile()).lastModified || 0;
+    } catch (_) {
+      // Cached handle may be stuck on a replaced entry — refresh and retry once.
+      if (await resolveFileHandle(f)) {
+        try { mtime = (await f.fileHandle.getFile()).lastModified || 0; } catch (_) { statOk = false; }
+      } else {
+        statOk = false;
+      }
+    }
+    if (!statOk) continue;
     if (mtime <= (f.lastSyncedMtime || 0)) continue;
 
     if (!f.dirty) {
