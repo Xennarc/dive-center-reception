@@ -926,6 +926,22 @@ animation: spin .6s linear infinite;
    ================================================================ */
 .day-summary-inactive { color: var(--muted); font-style: italic; }
 
+/* "Saving — please don't close" indicator next to the status pill.
+   Only visible while STATE.saving has entries. */
+.saving-indicator {
+  display: none; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(133, 100, 55, 0.18); color: #6b502c;
+  font-size: 12px; font-weight: 500;
+}
+.saving-indicator.is-on { display: inline-flex; }
+.saving-indicator .spinner {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: saving-spin 0.8s linear infinite;
+}
+@keyframes saving-spin { to { transform: rotate(360deg); } }
+
 .show-cancelled-toggle {
   margin-top: 6px; padding: 4px 12px; border-radius: 999px;
   border: 1px solid var(--border); background: transparent;
@@ -1050,6 +1066,9 @@ animation: spin .6s linear infinite;
     <div class="spacer"></div>
     <div id="status-area" style="display:none; gap: 6px; align-items:center;">
       <span id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">Ready</span></span>
+      <span id="saving-indicator" class="saving-indicator" title="A save is in progress — closing now risks corrupting the file">
+        <span class="spinner"></span><span>Saving — please don't close</span>
+      </span>
       <button id="btn-reload" class="btn-icon" title="Reload from disk">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
       </button>
@@ -1913,6 +1932,7 @@ async function saveAll() {
   let saved = 0;
   for (const f of dirtyFiles) {
     STATE.saving.add(f.name);
+    updateSavingIndicator();
     let lockHandle = null;
     try {
       // Snapshot the op log BEFORE any await so ops queued during save survive.
@@ -1924,6 +1944,7 @@ async function saveAll() {
         // leftover lockfile from a crashed tab, slow share), proceed anyway —
         // the mtime check + replayOps below is the real safety net.
         lockHandle = await acquireLock(f.name);
+        if (lockHandle) _heldLocks.add(lockHandle);
 
         // Conflict detection: re-stat lastModified against our last known.
         // If the cached handle has gone stale (file replaced externally),
@@ -1996,6 +2017,7 @@ async function saveAll() {
       if (f.pendingOps && opCount) f.pendingOps.splice(0, opCount);
       f.dirty = !!(f.pendingOps && f.pendingOps.length > 0);
       f.remoteChanged = false;
+      persistPendingOps(f);
       saved++;
     } catch (err) {
       console.error(err);
@@ -2010,9 +2032,11 @@ async function saveAll() {
       }
     } finally {
       if (lockHandle) {
+        _heldLocks.delete(lockHandle);
         try { await releaseLock(lockHandle); } catch (e) { console.warn('lock release', e); }
       }
       STATE.saving.delete(f.name);
+      updateSavingIndicator();
     }
   }
   if (saved) toast(`Saved ${saved} file${saved>1?'s':''}`, 'success');
@@ -2059,6 +2083,10 @@ let replaying = false;
 // Background poller interval id.
 let _pollTimer = null;
 
+// Locks currently held by this tab. Tracked outside saveAll so the
+// pagehide handler can fire-and-forget removeEntry on tab close.
+const _heldLocks = new Set();
+
 function _uuid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
@@ -2068,6 +2096,47 @@ function recordOp(fileEntry, op) {
   if (replaying) return;
   if (!fileEntry.pendingOps) fileEntry.pendingOps = [];
   fileEntry.pendingOps.push(op);
+  persistPendingOps(fileEntry);
+}
+
+/* ---------- Crash-recovery: persist pendingOps to localStorage ----------
+   A tab closed (or crashed) before its dirty edits are saved would
+   otherwise lose them silently. Each file's op log is mirrored under
+   localStorage so the next session can offer to replay it. Scoped to
+   'fs' mode only — 'fp' mode has no stable identity for the folder. */
+function _opsKey(fileEntry) {
+  if (STATE.mode !== 'fs' || !STATE.dirHandle) return null;
+  // dirHandle.name is the folder basename — not globally unique, but
+  // good enough for the small-team use case. Falsely matching across
+  // two unrelated folders with the same name would surface as a
+  // recovery prompt the user can decline.
+  return 'reefdesk:pendingOps:' + STATE.dirHandle.name + ':' + fileEntry.name;
+}
+function persistPendingOps(fileEntry) {
+  const key = _opsKey(fileEntry);
+  if (!key) return;
+  try {
+    if (fileEntry.pendingOps && fileEntry.pendingOps.length) {
+      localStorage.setItem(key, JSON.stringify(fileEntry.pendingOps));
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch (_) {}
+}
+function loadPersistedOps(fileEntry) {
+  const key = _opsKey(fileEntry);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const ops = JSON.parse(raw);
+    return Array.isArray(ops) && ops.length ? ops : null;
+  } catch (_) { return null; }
+}
+function clearPersistedOps(fileEntry) {
+  const key = _opsKey(fileEntry);
+  if (!key) return;
+  try { localStorage.removeItem(key); } catch (_) {}
 }
 
 /**
@@ -2372,6 +2441,64 @@ async function openDirectory(handle) {
   toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
   await loadFiles(specs);
   showWorkspace();
+  await offerCrashRecovery();
+}
+
+/**
+ * If a previous session left pendingOps in localStorage (tab closed or
+ * crashed before save), offer the user a one-click replay onto the
+ * freshly-loaded workbook. Declining clears the stored ops.
+ */
+async function offerCrashRecovery() {
+  const candidates = [];
+  for (const f of STATE.files) {
+    const ops = loadPersistedOps(f);
+    if (ops && ops.length) candidates.push({ f, ops });
+  }
+  if (!candidates.length) return;
+  const total = candidates.reduce((n, c) => n + c.ops.length, 0);
+  await new Promise((resolve) => {
+    const fileList = el('ul', { style: { margin: '8px 0 0 18px', padding: 0, fontSize: '12px', color: 'var(--muted)' } },
+      ...candidates.map(c => el('li', {}, `${c.f.name} — ${c.ops.length} change${c.ops.length>1?'s':''}`)),
+    );
+    const restore = async () => {
+      let restored = 0;
+      for (const { f, ops } of candidates) {
+        try {
+          await replayOps(f, ops);
+          f.pendingOps = ops.slice();
+          f.dirty = true;
+          persistPendingOps(f);
+          restored += ops.length;
+        } catch (e) {
+          console.error('recovery replay failed', f.name, e);
+          toast(`Couldn't restore changes for ${f.name}`, 'error');
+          clearPersistedOps(f);
+        }
+      }
+      rebuildBookings();
+      updateStatus();
+      renderView();
+      closeModal();
+      if (restored) toast(`Restored ${restored} unsaved change${restored>1?'s':''} — press Save to write them.`, 'success');
+      resolve();
+    };
+    const discard = () => {
+      for (const { f } of candidates) clearPersistedOps(f);
+      closeModal();
+      resolve();
+    };
+    const node = el('div', {},
+      el('h2', {}, 'Restore ', el('em', {}, 'unsaved changes'), '?'),
+      el('div', { class: 'sub' }, `Your previous session left ${total} unsaved change${total>1?'s':''} that never made it to disk. Restore them now, or discard.`),
+      el('div', { class: 'body' }, fileList),
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn', onclick: discard }, 'Discard'),
+        el('button', { class: 'btn btn-primary', onclick: restore }, 'Restore'),
+      ),
+    );
+    openModal(node);
+  });
 }
 async function pickDirectory() {
   if (!('showDirectoryPicker' in window)) {
@@ -2457,6 +2584,12 @@ function updateStatus(){
     txt.textContent = `${STATE.files.length} file${STATE.files.length>1?'s':''}`;
   }
   $('#btn-save').disabled = !dirty;
+}
+
+function updateSavingIndicator(){
+  const ind = $('#saving-indicator');
+  if (!ind) return;
+  ind.classList.toggle('is-on', STATE.saving.size > 0);
 }
 
 /* ============================================================
@@ -4533,7 +4666,24 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('beforeunload', e=>{
   stopPoller();
-  if (STATE.files.some(f=>f.dirty)) { e.preventDefault(); e.returnValue = ''; }
+  // Block on either dirty edits OR an in-flight save. The save case is
+  // belt-and-braces (dirty stays true until splice), but a tab killed
+  // mid-write can corrupt the .xlsx, so the prompt is worth showing.
+  if (STATE.files.some(f=>f.dirty) || STATE.saving.size > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+// Best-effort: release any locks we still hold so peers don't have to
+// wait for the 12s stale-lock timeout. Browsers don't reliably await
+// async work on unload, so this is fire-and-forget; the stale-lock
+// detector remains the real safety net.
+window.addEventListener('pagehide', () => {
+  if (STATE.mode !== 'fs' || !STATE.dirHandle) return;
+  for (const lock of _heldLocks) {
+    try { STATE.dirHandle.removeEntry(lock.candidateName); } catch (_) {}
+  }
+  _heldLocks.clear();
 });
 document.addEventListener('visibilitychange', () => {
   // pollExternalChanges already short-circuits when document.hidden, but
