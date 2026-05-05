@@ -27,7 +27,7 @@ The HTML files are too large to `Read` whole-file. Use line offsets:
 - Lines 59–83: inlined pdfjs-dist@3.11.174 (main bundle) — **skip**.
 - Lines 84–1040: `<style>` block.
 - Lines 1043–1126: `<body>` markup (header, welcome, workspace, `#modal-mount`, `#toast-mount`, hidden `#file-input` / `#pdf-input`).
-- Lines 1128–4446: the application `<script>` (in v5; v4 ends around 4042). The pdf.js **worker** is inlined as a string literal in the first ~50 lines of this script; ignore that block when grepping. After it, top-level `const STATE = { … }` (line ~1140) and named sections delimited by `/* === … === */` banners.
+- Lines 1128–4446: the application `<script>` (in v5; v4 ends around 4221). The pdf.js **worker** is inlined as a string literal in the first ~50 lines of this script; ignore that block when grepping. After it, top-level `const STATE = { … }` (line 1140) and named sections delimited by `/* === … === */` banners.
 
 Use `grep -n '/\* ============================================================' "Booking engine v5.html"` to jump between sections. Section banners are: Date helpers, Cell helpers, Layout detection, Booking I/O, Meta sheets, File load, Save / reload, **Sync (multi-user)**, File source, View shell, Date strip, Main view dispatch, Agenda view, People view, Search results, Modals, Inhouse PDF parsing, Inhouse reports modal, Stats dashboard, Wire-up.
 
@@ -68,6 +68,6 @@ Use `grep -n '/\* ============================================================' 
 
 ## Git workflow
 
-Working branch for this session: `claude/add-claude-documentation-9guLu`. Develop, commit, and push to that branch. Don't push to `main`.
+Working branch for this session: `claude/add-claude-documentation-rCoWP`. Develop, commit, and push to that branch. Don't push to `main`.
 
 Note that `Booking engine v4.html` is ~2.5 MB; some agent tooling can't transmit it through a single tool call. If a push fails for size/proxy reasons, capture the change as a patch under `patches/` and document it in `patches/README.md` (this is exactly how v4 itself was delivered — see `.branch-notes.md` and `patches/0001-autofill-and-pdf-management.patch`).
