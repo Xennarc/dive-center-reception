@@ -1,0 +1,1172 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sheet Shaper · Reef Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Onest:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root {
+  --bg: #F4F1EA;
+  --card: #FFFFFF;
+  --surface-2: #EBE6D8;
+  --surface-3: #F8F5EE;
+  --border: #E2DCCD;
+  --border-strong: #CFC8B8;
+  --ink: #2A2722;
+  --ink-2: #5A5347;
+  --ink-3: #8A8278;
+  --accent: #3A6B7A;
+  --accent-deep: #26505C;
+  --accent-soft: #E5EEF0;
+  --warn: #B85C3D;
+  --good: #5A7A3A;
+  --gold: #C9842B;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Onest', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+- { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+  font-family: var(–sans);
+  background: var(–bg);
+  color: var(–ink);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  }
+
+/* ===== Header ===== */
+header {
+border-bottom: 1px solid var(–border);
+background: var(–bg);
+position: sticky;
+top: 0;
+z-index: 10;
+backdrop-filter: blur(8px);
+}
+.bar {
+max-width: 1200px;
+margin: 0 auto;
+padding: 14px 24px;
+display: flex;
+align-items: center;
+gap: 16px;
+}
+.brand {
+display: flex;
+align-items: baseline;
+gap: 10px;
+}
+.brand .mark {
+width: 22px; height: 22px;
+border-radius: 50%;
+background: radial-gradient(circle at 35% 35%, var(–accent) 0%, var(–accent-deep) 70%);
+align-self: center;
+}
+.brand .name {
+font-family: var(–serif);
+font-size: 20px;
+font-weight: 500;
+letter-spacing: -0.01em;
+}
+.brand .name em { font-style: italic; font-weight: 400; color: var(–accent-deep); }
+.brand .tag {
+font-size: 11px;
+text-transform: uppercase;
+letter-spacing: 0.12em;
+color: var(–ink-3);
+padding-left: 12px;
+margin-left: 2px;
+border-left: 1px solid var(–border-strong);
+align-self: center;
+}
+.spacer { flex: 1; }
+
+/* ===== Main ===== */
+main {
+max-width: 1200px;
+margin: 0 auto;
+padding: 28px 24px 80px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+display: inline-flex;
+align-items: center;
+gap: 8px;
+padding: 9px 16px;
+border-radius: 8px;
+font-family: var(–sans);
+font-size: 14px;
+font-weight: 500;
+border: 1px solid var(–border-strong);
+background: var(–card);
+color: var(–ink);
+cursor: pointer;
+transition: all .15s ease;
+white-space: nowrap;
+}
+.btn:hover { border-color: var(–ink-3); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn.btn-primary {
+background: var(–accent);
+color: white;
+border-color: var(–accent-deep);
+}
+.btn.btn-primary:hover { background: var(–accent-deep); }
+.btn.btn-ghost { border-color: transparent; background: transparent; }
+.btn.btn-ghost:hover { background: var(–surface-2); border-color: var(–border); }
+.btn.btn-large {
+padding: 14px 24px;
+font-size: 15px;
+}
+.btn .icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ===== Welcome ===== */
+.welcome {
+margin: 24px 0;
+padding: 64px 32px;
+background:
+radial-gradient(circle at 80% 20%, rgba(58,107,122,0.06) 0%, transparent 50%),
+var(–card);
+border: 1px solid var(–border);
+border-radius: 16px;
+text-align: center;
+}
+.welcome h1 {
+font-family: var(–serif);
+font-size: clamp(32px, 4vw, 44px);
+font-weight: 400;
+letter-spacing: -0.02em;
+margin: 0 0 12px;
+line-height: 1.1;
+}
+.welcome h1 em { font-style: italic; color: var(–accent-deep); }
+.welcome p {
+color: var(–ink-2);
+font-size: 16px;
+max-width: 520px;
+margin: 0 auto 32px;
+}
+.welcome .pickers {
+display: inline-flex;
+gap: 12px;
+flex-wrap: wrap;
+justify-content: center;
+}
+.welcome small {
+display: block;
+margin-top: 24px;
+color: var(–ink-3);
+font-size: 12px;
+}
+
+/* ===== Workspace top ===== */
+.work-head {
+display: flex;
+align-items: flex-end;
+gap: 24px;
+flex-wrap: wrap;
+margin-bottom: 24px;
+padding-bottom: 20px;
+border-bottom: 1px solid var(–border);
+}
+.work-head h2 {
+font-family: var(–serif);
+font-weight: 400;
+font-size: 32px;
+letter-spacing: -0.01em;
+margin: 0;
+line-height: 1.1;
+}
+.work-head h2 em { font-style: italic; color: var(–accent-deep); }
+.work-head .sub {
+color: var(–ink-2);
+font-size: 13px;
+margin-top: 4px;
+}
+.month-picker {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+.month-picker label {
+font-size: 11px;
+text-transform: uppercase;
+letter-spacing: 0.1em;
+color: var(–ink-3);
+}
+.month-picker input {
+font-family: var(–sans);
+font-size: 15px;
+padding: 8px 12px;
+border: 1px solid var(–border-strong);
+border-radius: 8px;
+background: var(–card);
+color: var(–ink);
+}
+.format-picker {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+.format-picker label {
+font-size: 11px;
+text-transform: uppercase;
+letter-spacing: 0.1em;
+color: var(–ink-3);
+}
+.format-picker select {
+font-family: var(–sans);
+font-size: 14px;
+padding: 8px 12px;
+border: 1px solid var(–border-strong);
+border-radius: 8px;
+background: var(–card);
+color: var(–ink);
+cursor: pointer;
+}
+
+/* ===== Master cards ===== */
+.masters {
+display: grid;
+grid-template-columns: 1fr;
+gap: 14px;
+margin-bottom: 28px;
+}
+.master {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: 12px;
+padding: 18px 20px;
+display: grid;
+grid-template-columns: minmax(200px, 1fr) auto auto;
+gap: 24px;
+align-items: center;
+transition: border-color .15s ease;
+}
+.master:hover { border-color: var(–border-strong); }
+.master.zero { background: linear-gradient(to right, rgba(184,92,61,0.04), var(–card)); }
+.master .name-block .filename {
+font-family: var(–mono);
+font-size: 11px;
+color: var(–ink-3);
+margin-bottom: 4px;
+}
+.master .name-block .excursion {
+font-family: var(–serif);
+font-size: 19px;
+font-weight: 500;
+letter-spacing: -0.005em;
+line-height: 1.2;
+}
+.master .pills {
+display: flex;
+gap: 4px;
+}
+.pill {
+width: 36px;
+height: 36px;
+display: flex;
+align-items: center;
+justify-content: center;
+border-radius: 8px;
+border: 1px solid var(–border-strong);
+background: var(–card);
+font-family: var(–sans);
+font-size: 13px;
+font-weight: 500;
+color: var(–ink-2);
+cursor: pointer;
+transition: all .12s ease;
+user-select: none;
+}
+.pill:hover { border-color: var(–ink-3); }
+.pill.on {
+background: var(–accent);
+color: white;
+border-color: var(–accent-deep);
+}
+.pill.on:hover { background: var(–accent-deep); }
+.master .summary {
+text-align: right;
+min-width: 100px;
+}
+.master .count {
+font-family: var(–serif);
+font-size: 28px;
+font-weight: 400;
+line-height: 1;
+color: var(–ink);
+font-variant-numeric: tabular-nums;
+}
+.master.zero .count { color: var(–warn); }
+.master .count-label {
+font-size: 11px;
+text-transform: uppercase;
+letter-spacing: 0.1em;
+color: var(–ink-3);
+margin-top: 6px;
+}
+
+/* ===== Calendar preview (per master, expandable) ===== */
+.master-detail {
+grid-column: 1 / -1;
+margin-top: 8px;
+padding-top: 16px;
+border-top: 1px dashed var(–border);
+display: none;
+}
+.master.expanded .master-detail { display: block; }
+.master .toggle {
+font-size: 11px;
+color: var(–accent);
+cursor: pointer;
+background: none;
+border: none;
+padding: 0;
+font-family: var(–sans);
+text-transform: uppercase;
+letter-spacing: 0.1em;
+font-weight: 500;
+}
+.master .toggle:hover { color: var(–accent-deep); }
+.cal-grid {
+display: grid;
+grid-template-columns: repeat(7, 1fr);
+gap: 4px;
+max-width: 360px;
+}
+.cal-cell {
+aspect-ratio: 1;
+display: flex;
+align-items: center;
+justify-content: center;
+font-family: var(–mono);
+font-size: 12px;
+border-radius: 5px;
+background: var(–surface-2);
+color: var(–ink-3);
+}
+.cal-cell.match {
+background: var(–accent-soft);
+color: var(–accent-deep);
+font-weight: 500;
+}
+.cal-cell.empty { background: transparent; }
+.cal-head {
+font-size: 10px;
+text-transform: uppercase;
+letter-spacing: 0.08em;
+color: var(–ink-3);
+text-align: center;
+font-family: var(–sans);
+font-weight: 500;
+}
+
+/* ===== Footer / Generate ===== */
+.gen-footer {
+position: sticky;
+bottom: 0;
+background: linear-gradient(to top, var(–bg) 70%, transparent);
+padding: 24px 0 12px;
+margin-top: 28px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+gap: 16px;
+flex-wrap: wrap;
+}
+.gen-summary {
+font-family: var(–mono);
+font-size: 13px;
+color: var(–ink-2);
+}
+.gen-summary strong {
+font-weight: 500;
+color: var(–ink);
+}
+
+/* ===== Toast ===== */
+.toast {
+position: fixed;
+bottom: 24px;
+left: 50%;
+transform: translateX(-50%);
+padding: 12px 20px;
+background: var(–ink);
+color: white;
+border-radius: 8px;
+font-size: 14px;
+z-index: 100;
+animation: toastIn .3s ease;
+}
+.toast.err { background: var(–warn); }
+@keyframes toastIn {
+from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ===== Result modal ===== */
+.modal-mount {
+position: fixed;
+inset: 0;
+background: rgba(42, 39, 34, 0.45);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 50;
+padding: 24px;
+animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from {opacity:0} to {opacity:1} }
+.modal {
+background: var(–card);
+border-radius: 16px;
+width: 100%;
+max-width: 600px;
+max-height: 80vh;
+overflow: auto;
+padding: 32px;
+box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+}
+.modal h3 {
+font-family: var(–serif);
+font-weight: 400;
+font-size: 26px;
+letter-spacing: -0.01em;
+margin: 0 0 8px;
+}
+.modal h3 em { font-style: italic; color: var(–accent-deep); }
+.modal .modal-sub {
+color: var(–ink-2);
+font-size: 14px;
+margin-bottom: 24px;
+}
+.result-tree {
+display: flex;
+flex-direction: column;
+gap: 10px;
+margin-bottom: 24px;
+}
+.result-file {
+border: 1px solid var(–border);
+border-radius: 10px;
+padding: 14px 16px;
+background: var(–surface-3);
+}
+.result-file .rfn {
+font-family: var(–mono);
+font-size: 13px;
+color: var(–ink);
+font-weight: 500;
+margin-bottom: 4px;
+}
+.result-file .rfm {
+font-size: 12px;
+color: var(–ink-3);
+}
+.result-file.err {
+background: rgba(184,92,61,0.06);
+border-color: rgba(184,92,61,0.25);
+}
+.result-file.err .rfm { color: var(–warn); }
+.modal .actions {
+display: flex;
+gap: 8px;
+justify-content: flex-end;
+}
+
+/* ===== Hidden ===== */
+.hidden { display: none !important; }
+
+/* ===== Status pill ===== */
+.status-pill {
+display: inline-flex;
+align-items: center;
+gap: 6px;
+padding: 5px 10px;
+border-radius: 99px;
+background: var(–surface-2);
+font-size: 12px;
+color: var(–ink-2);
+font-family: var(–mono);
+}
+.status-pill .dot {
+width: 6px; height: 6px; border-radius: 50%;
+background: var(–good);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 720px) {
+.bar { padding: 12px 16px; flex-wrap: wrap; }
+.brand .tag { display: none; }
+main { padding: 20px 16px 80px; }
+.work-head { gap: 12px; }
+.work-head h2 { font-size: 26px; }
+.master {
+grid-template-columns: 1fr;
+gap: 14px;
+}
+.master .summary { text-align: left; }
+.master .pills { flex-wrap: wrap; }
+.welcome { padding: 40px 20px; }
+.welcome h1 { font-size: 32px; }
+}
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="brand">
+      <div class="mark"></div>
+      <div class="name">Sheet <em>Shaper</em></div>
+      <span class="tag">Reef Desk · Workbook generator</span>
+    </div>
+    <div class="spacer"></div>
+    <span id="status-pill" class="status-pill hidden"><span class="dot"></span><span id="status-text">Ready</span></span>
+    <button id="btn-reset" class="btn btn-ghost hidden" title="Start over">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- ===== WELCOME ===== -->
+  <section id="welcome" class="welcome">
+    <h1>Shape monthly <em>workbooks</em>.<br>From masters &amp; a calendar.</h1>
+    <p>Drop a folder of empty excursion masters. Tell Sheet Shaper which days each excursion runs. It produces clean, dated workbooks ready for Reef Desk.</p>
+    <div class="pickers">
+      <button id="btn-pick-folder" class="btn btn-primary btn-large">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Open folder of masters
+      </button>
+      <button id="btn-pick-files" class="btn btn-large">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Pick files manually
+      </button>
+    </div>
+    <small>Folder mode requires Chrome or Edge. Files mode works anywhere.</small>
+  </section>
+
+  <!-- ===== WORKSPACE ===== -->
+
+  <section id="workspace" class="hidden">
+    <div class="work-head">
+      <div>
+        <h2>Configure each <em>excursion</em></h2>
+        <div class="sub">Tap days to toggle. Watch the count update in real time.</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="month-picker">
+        <label>Target month</label>
+        <input type="month" id="target-month" />
+      </div>
+      <div class="format-picker">
+        <label>Tab name format</label>
+        <select id="format-picker">
+          <option value="DD-MMM">05-May</option>
+          <option value="DD MMM">05 May</option>
+          <option value="DD-MM">05-05</option>
+          <option value="MMM DD">May 05</option>
+          <option value="Day DD">Day 05</option>
+        </select>
+      </div>
+    </div>
+
+```
+<div id="masters" class="masters"></div>
+
+<div class="gen-footer">
+  <div class="gen-summary" id="gen-summary">No excursions loaded.</div>
+  <button id="btn-generate" class="btn btn-primary btn-large">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 0l-3-3m3 3l3-3"/><rect x="3" y="13" width="18" height="8" rx="2"/></svg>
+    Generate workbooks
+  </button>
+</div>
+```
+
+  </section>
+</main>
+
+<input type="file" id="file-input" multiple accept=".xlsx" style="display:none;" />
+<div id="modal-mount"></div>
+<div id="toast-mount"></div>
+
+<script>
+/* =====================================================================
+   Sheet Shaper · Reef Desk
+   - Reads a folder of empty excursion master .xlsx files
+   - For each, picks day-of-week pattern + target month
+   - Generates a workbook with one tab per running date in that month
+   - Tab content = template duplicated; placeholders {{date}} replaced
+   ===================================================================== */
+
+const STATE = {
+  mode: 'fs',          // 'fs' or 'files'
+  dirHandle: null,     // FileSystemDirectoryHandle
+  outDirHandle: null,  // output subfolder handle
+  masters: [],         // [{name, fileHandle?, fileObj, workbook, templateSheet, days:[7]bool}]
+  targetMonth: '',     // 'YYYY-MM'
+  format: 'DD-MMM',
+};
+
+const DAY_LABELS = ['M','T','W','T','F','S','S']; // Mon..Sun
+const DAY_LONG = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') e.className = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+
+function toast(msg, kind = '') {
+  const t = el('div', { class: 'toast ' + kind }, msg);
+  $('#toast-mount').append(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+/* ===== Date helpers ===== */
+
+// Returns 0..6 for Mon..Sun, normalising JS's Sun=0 quirk
+function dowMon0(date) {
+  const d = date.getDay();
+  return d === 0 ? 6 : d - 1;
+}
+
+function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
+function defaultMonth() {
+  const t = new Date();
+  // If we're past day 20, default to next month — staff usually plan ahead
+  if (t.getDate() > 20) t.setMonth(t.getMonth() + 1);
+  return t.getFullYear() + '-' + pad2(t.getMonth() + 1);
+}
+
+function datesInMonth(yyyymm, daysMask) {
+  const [y, m] = yyyymm.split('-').map(Number);
+  const dim = new Date(y, m, 0).getDate();
+  const out = [];
+  for (let d = 1; d <= dim; d++) {
+    const dt = new Date(y, m - 1, d);
+    if (daysMask[dowMon0(dt)]) out.push(dt);
+  }
+  return out;
+}
+
+function formatTabName(date, fmt) {
+  const dd = pad2(date.getDate());
+  const mm = pad2(date.getMonth() + 1);
+  const mmm = MONTH_SHORT[date.getMonth()];
+  switch (fmt) {
+    case 'DD-MMM': return `${dd}-${mmm}`;
+    case 'DD MMM': return `${dd} ${mmm}`;
+    case 'DD-MM':  return `${dd}-${mm}`;
+    case 'MMM DD': return `${mmm} ${dd}`;
+    case 'Day DD': return `Day ${dd}`;
+    default: return `${dd}-${mmm}`;
+  }
+}
+
+function formatLongDate(date) {
+  return `${date.getDate()} ${MONTH_LONG[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function safeFilename(s) {
+  return s.replace(/[\\/:*?"<>|]+/g, '_').trim();
+}
+
+/* ===== File picking ===== */
+
+async function pickFolder() {
+  if (!window.showDirectoryPicker) {
+    toast('Folder picker not available — use "Pick files" instead', 'err');
+    return;
+  }
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch (e) { return; }
+
+  STATE.mode = 'fs';
+  STATE.dirHandle = dirHandle;
+  STATE.masters = [];
+
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind !== 'file') continue;
+    if (!/\.xlsx$/i.test(name)) continue;
+    if (name.startsWith('~$') || name.startsWith('.')) continue;
+    try {
+      const file = await handle.getFile();
+      await registerMaster(name, file, handle);
+    } catch (e) {
+      console.error('skip', name, e);
+    }
+  }
+
+  finishLoad();
+}
+
+async function pickFiles() {
+  $('#file-input').click();
+}
+
+async function handleFileInput(ev) {
+  const files = Array.from(ev.target.files || []);
+  if (!files.length) return;
+  STATE.mode = 'files';
+  STATE.dirHandle = null;
+  STATE.masters = [];
+  for (const f of files) {
+    if (!/\.xlsx$/i.test(f.name)) continue;
+    await registerMaster(f.name, f, null);
+  }
+  finishLoad();
+  ev.target.value = '';
+}
+
+async function registerMaster(name, file, fileHandle) {
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.worksheets[0];
+    if (!ws) throw new Error('no sheet');
+
+    const excursionName = name.replace(/\.xlsx$/i, '').replace(/[_]+/g, ' ').trim();
+
+    // Default day pattern: try loading from localStorage by excursion name
+    const stored = loadDayPattern(excursionName);
+    const days = stored || [true, true, true, true, true, true, true];
+
+    STATE.masters.push({
+      name,
+      excursionName,
+      fileObj: file,
+      fileHandle,
+      workbook: wb,
+      templateSheet: ws,
+      days,
+    });
+  } catch (e) {
+    toast(`Couldn't read ${name}: ${e.message}`, 'err');
+  }
+}
+
+function finishLoad() {
+  if (!STATE.masters.length) {
+    toast('No .xlsx files found', 'err');
+    return;
+  }
+  STATE.targetMonth = defaultMonth();
+  $('#target-month').value = STATE.targetMonth;
+  $('#welcome').classList.add('hidden');
+  $('#workspace').classList.remove('hidden');
+  $('#status-pill').classList.remove('hidden');
+  $('#btn-reset').classList.remove('hidden');
+  updateStatus();
+  renderMasters();
+}
+
+function updateStatus() {
+  const n = STATE.masters.length;
+  $('#status-text').textContent = `${n} master${n === 1 ? '' : 's'}`;
+}
+
+function reset() {
+  STATE.masters = [];
+  STATE.dirHandle = null;
+  STATE.outDirHandle = null;
+  STATE.targetMonth = '';
+  $('#workspace').classList.add('hidden');
+  $('#welcome').classList.remove('hidden');
+  $('#status-pill').classList.add('hidden');
+  $('#btn-reset').classList.add('hidden');
+  $('#masters').innerHTML = '';
+}
+
+/* ===== localStorage for day patterns ===== */
+
+const LS_KEY = 'sheetshaper.daypatterns.v1';
+function loadAllPatterns() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }
+  catch { return {}; }
+}
+function loadDayPattern(name) {
+  const all = loadAllPatterns();
+  return all[name] || null;
+}
+function saveDayPattern(name, days) {
+  const all = loadAllPatterns();
+  all[name] = days;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(all)); } catch {}
+}
+
+/* ===== Render ===== */
+
+function renderMasters() {
+  const root = $('#masters');
+  root.innerHTML = '';
+  STATE.masters.forEach((m, idx) => root.append(renderMaster(m, idx)));
+  updateGenSummary();
+}
+
+function renderMaster(m, idx) {
+  const dates = STATE.targetMonth ? datesInMonth(STATE.targetMonth, m.days) : [];
+  const card = el('div', { class: 'master' + (dates.length === 0 ? ' zero' : '') });
+
+  // Name block
+  const nameBlock = el('div', { class: 'name-block' },
+    el('div', { class: 'filename' }, m.name),
+    el('div', { class: 'excursion' }, m.excursionName),
+    el('button', {
+      class: 'toggle',
+      style: { marginTop: '8px' },
+      onclick: () => {
+        card.classList.toggle('expanded');
+      }
+    }, '▾ Calendar preview')
+  );
+
+  // Pills
+  const pills = el('div', { class: 'pills' });
+  DAY_LABELS.forEach((lbl, i) => {
+    const p = el('button', {
+      class: 'pill' + (m.days[i] ? ' on' : ''),
+      title: DAY_LONG[i],
+      onclick: () => {
+        m.days[i] = !m.days[i];
+        saveDayPattern(m.excursionName, m.days);
+        renderMasters();
+      }
+    }, lbl);
+    pills.append(p);
+  });
+
+  // Summary
+  const summary = el('div', { class: 'summary' },
+    el('div', { class: 'count' }, String(dates.length)),
+    el('div', { class: 'count-label' }, dates.length === 1 ? 'date' : 'dates')
+  );
+
+  card.append(nameBlock, pills, summary);
+
+  // Detail
+  const detail = el('div', { class: 'master-detail' });
+  detail.append(renderCalendar(m));
+  card.append(detail);
+
+  return card;
+}
+
+function renderCalendar(m) {
+  const wrap = el('div');
+  if (!STATE.targetMonth) return wrap;
+
+  const [y, mm] = STATE.targetMonth.split('-').map(Number);
+  const first = new Date(y, mm - 1, 1);
+  const dim = new Date(y, mm, 0).getDate();
+  const startDow = dowMon0(first);
+
+  // Weekday header
+  const grid = el('div', { class: 'cal-grid' });
+  DAY_LABELS.forEach(l => grid.append(el('div', { class: 'cal-head' }, l)));
+  for (let i = 0; i < startDow; i++) grid.append(el('div', { class: 'cal-cell empty' }));
+  for (let d = 1; d <= dim; d++) {
+    const dt = new Date(y, mm - 1, d);
+    const matches = m.days[dowMon0(dt)];
+    grid.append(el('div', {
+      class: 'cal-cell' + (matches ? ' match' : '')
+    }, String(d)));
+  }
+  wrap.append(grid);
+  return wrap;
+}
+
+function updateGenSummary() {
+  const sum = $('#gen-summary');
+  if (!STATE.targetMonth) {
+    sum.textContent = 'Pick a target month.';
+    return;
+  }
+  let totalSheets = 0;
+  let live = 0;
+  for (const m of STATE.masters) {
+    const n = datesInMonth(STATE.targetMonth, m.days).length;
+    totalSheets += n;
+    if (n > 0) live++;
+  }
+  const [y, mm] = STATE.targetMonth.split('-').map(Number);
+  const monthLabel = `${MONTH_LONG[mm - 1]} ${y}`;
+  sum.innerHTML = `<strong>${live}</strong> workbooks · <strong>${totalSheets}</strong> sheets · ${monthLabel}`;
+  $('#btn-generate').disabled = totalSheets === 0;
+}
+
+/* ===== Workbook generation ===== */
+
+/**
+ * Copy a worksheet's content/formatting into a new worksheet.
+ * Preserves cell values, formulas, styles, merges, column widths, row heights.
+ * Replaces date placeholders in cell strings.
+ */
+function copyTemplateSheet(srcWs, destWs, dateContext) {
+  // Column widths + styles
+  if (srcWs.columns) {
+    srcWs.columns.forEach((col, i) => {
+      const destCol = destWs.getColumn(i + 1);
+      if (col.width) destCol.width = col.width;
+      if (col.hidden) destCol.hidden = col.hidden;
+      if (col.style) destCol.style = JSON.parse(JSON.stringify(col.style));
+    });
+  }
+
+  // Row data + cell styles
+  srcWs.eachRow({ includeEmpty: true }, (row, rowNum) => {
+    const destRow = destWs.getRow(rowNum);
+    if (row.height) destRow.height = row.height;
+    if (row.hidden) destRow.hidden = row.hidden;
+    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      const destCell = destRow.getCell(colNum);
+      let val = cell.value;
+      if (val && typeof val === 'object' && val.formula) {
+        // Preserve formula
+        destCell.value = { formula: val.formula, result: val.result };
+      } else if (typeof val === 'string') {
+        destCell.value = applyDatePlaceholders(val, dateContext);
+      } else if (val && typeof val === 'object' && Array.isArray(val.richText)) {
+        // Rich text — reassemble with substitutions
+        const newRich = val.richText.map(part => ({
+          ...part,
+          text: applyDatePlaceholders(part.text || '', dateContext),
+        }));
+        destCell.value = { richText: newRich };
+      } else {
+        destCell.value = val;
+      }
+      if (cell.style && Object.keys(cell.style).length) {
+        destCell.style = JSON.parse(JSON.stringify(cell.style));
+      }
+      if (cell.numFmt) destCell.numFmt = cell.numFmt;
+    });
+    destRow.commit();
+  });
+
+  // Merged ranges
+  if (srcWs.model && Array.isArray(srcWs.model.merges)) {
+    for (const m of srcWs.model.merges) {
+      try { destWs.mergeCells(m); } catch (e) { /* ignore overlapping */ }
+    }
+  }
+
+  // Sheet view (frozen panes etc.)
+  if (srcWs.views && srcWs.views.length) {
+    destWs.views = JSON.parse(JSON.stringify(srcWs.views));
+  }
+
+  // Page setup (so prints look the same)
+  if (srcWs.pageSetup) {
+    destWs.pageSetup = JSON.parse(JSON.stringify(srcWs.pageSetup));
+  }
+}
+
+function applyDatePlaceholders(s, ctx) {
+  if (!s || typeof s !== 'string') return s;
+  return s
+    .replace(/\{\{\s*date\s*\}\}/gi, ctx.long)
+    .replace(/\{\{\s*shortdate\s*\}\}/gi, ctx.short)
+    .replace(/\{\{\s*tab\s*\}\}/gi, ctx.tab)
+    .replace(/\{\{\s*day\s*\}\}/gi, String(ctx.day))
+    .replace(/\{\{\s*month\s*\}\}/gi, ctx.monthName)
+    .replace(/\{\{\s*year\s*\}\}/gi, String(ctx.year))
+    .replace(/\{\{\s*dayofweek\s*\}\}/gi, ctx.dow)
+    .replace(/\{DATE\}/g, ctx.long)
+    .replace(/<DATE>/gi, ctx.long);
+}
+
+async function generateAll() {
+  const btn = $('#btn-generate');
+  btn.disabled = true;
+  btn.innerHTML = '<span>Generating…</span>';
+
+  const results = [];
+  const [yy, mm] = STATE.targetMonth.split('-').map(Number);
+  const monthLabel = `${MONTH_SHORT[mm - 1]}-${yy}`;
+
+  // Resolve output directory (only for fs mode)
+  let outDir = null;
+  if (STATE.mode === 'fs' && STATE.dirHandle) {
+    try {
+      const folderName = `Generated_${monthLabel}`;
+      outDir = await STATE.dirHandle.getDirectoryHandle(folderName, { create: true });
+      STATE.outDirHandle = outDir;
+    } catch (e) {
+      toast('Could not create output folder — falling back to downloads', 'err');
+      outDir = null;
+    }
+  }
+
+  for (const m of STATE.masters) {
+    const dates = datesInMonth(STATE.targetMonth, m.days);
+    if (dates.length === 0) {
+      results.push({ name: m.excursionName, status: 'skipped', reason: 'no running days' });
+      continue;
+    }
+
+    try {
+      const outWb = new ExcelJS.Workbook();
+      outWb.creator = 'Sheet Shaper';
+      outWb.created = new Date();
+
+      for (const dt of dates) {
+        const tabName = formatTabName(dt, STATE.format);
+        const ctx = {
+          long: formatLongDate(dt),
+          short: `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}`,
+          tab: tabName,
+          day: dt.getDate(),
+          monthName: MONTH_LONG[dt.getMonth()],
+          year: dt.getFullYear(),
+          dow: DAY_LONG[dowMon0(dt)],
+        };
+        // Excel sheet names: max 31 chars, no \\ / ? * [ ]
+        let safeName = tabName.replace(/[\\/?*\[\]:]/g, '_').slice(0, 31);
+        const ws = outWb.addWorksheet(safeName);
+        copyTemplateSheet(m.templateSheet, ws, ctx);
+      }
+
+      const outName = safeFilename(`${m.excursionName} — ${monthLabel}.xlsx`);
+      const buf = await outWb.xlsx.writeBuffer();
+
+      if (outDir) {
+        const fileHandle = await outDir.getFileHandle(outName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(buf);
+        await writable.close();
+      } else {
+        // Manual download
+        const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = outName;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+
+      results.push({
+        name: m.excursionName,
+        status: 'ok',
+        filename: outName,
+        sheets: dates.length,
+      });
+    } catch (e) {
+      console.error(e);
+      results.push({ name: m.excursionName, status: 'error', reason: e.message });
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 0l-3-3m3 3l3-3"/><rect x="3" y="13" width="18" height="8" rx="2"/></svg>
+    Generate workbooks
+  `;
+
+  showResultModal(results, outDir ? `Generated_${monthLabel}/` : null);
+}
+
+function showResultModal(results, outFolder) {
+  const ok = results.filter(r => r.status === 'ok');
+  const skip = results.filter(r => r.status === 'skipped');
+  const errs = results.filter(r => r.status === 'error');
+  const totalSheets = ok.reduce((s, r) => s + r.sheets, 0);
+
+  const tree = el('div', { class: 'result-tree' });
+  for (const r of results) {
+    if (r.status === 'ok') {
+      tree.append(el('div', { class: 'result-file' },
+        el('div', { class: 'rfn' }, r.filename),
+        el('div', { class: 'rfm' }, `${r.sheets} ${r.sheets === 1 ? 'tab' : 'tabs'} created`),
+      ));
+    } else if (r.status === 'skipped') {
+      tree.append(el('div', { class: 'result-file', style: { opacity: 0.6 } },
+        el('div', { class: 'rfn' }, r.name),
+        el('div', { class: 'rfm' }, `Skipped — ${r.reason}`),
+      ));
+    } else {
+      tree.append(el('div', { class: 'result-file err' },
+        el('div', { class: 'rfn' }, r.name),
+        el('div', { class: 'rfm' }, `Error — ${r.reason}`),
+      ));
+    }
+  }
+
+  const subtitle = outFolder
+    ? `Saved to <span style="font-family:var(--mono); color:var(--ink);">${outFolder}</span> in your folder.`
+    : 'Files downloaded to your downloads folder.';
+
+  const modal = el('div', { class: 'modal-mount' },
+    el('div', { class: 'modal' },
+      el('h3', { html: errs.length ? 'Done <em>with errors</em>' : 'All <em>shaped</em>.' }),
+      el('div', { class: 'modal-sub', html: `${ok.length} workbook${ok.length === 1 ? '' : 's'} · ${totalSheets} sheet${totalSheets === 1 ? '' : 's'}. ${subtitle}` }),
+      tree,
+      el('div', { class: 'actions' },
+        el('button', {
+          class: 'btn btn-primary',
+          onclick: () => modal.remove(),
+        }, 'Close')
+      )
+    )
+  );
+  $('#modal-mount').append(modal);
+}
+
+/* ===== Wire up ===== */
+
+document.addEventListener('DOMContentLoaded', () => {
+  $('#btn-pick-folder').addEventListener('click', pickFolder);
+  $('#btn-pick-files').addEventListener('click', pickFiles);
+  $('#file-input').addEventListener('change', handleFileInput);
+  $('#btn-reset').addEventListener('click', reset);
+  $('#btn-generate').addEventListener('click', generateAll);
+
+  $('#target-month').addEventListener('change', e => {
+    STATE.targetMonth = e.target.value;
+    renderMasters();
+  });
+  $('#format-picker').addEventListener('change', e => {
+    STATE.format = e.target.value;
+  });
+
+  // Default month
+  $('#target-month').value = defaultMonth();
+});
+</script>
+
+</body>
+</html>
