@@ -1037,6 +1037,182 @@ animation: spin .6s linear infinite;
   color: #8c4636; padding: 4px 8px; cursor: pointer; font-size: 12px;
 }
 .btn-link-danger:hover { background: rgba(168, 90, 74, 0.08); border-color: rgba(168, 90, 74, 0.3); }
+
+/* === Ops theme override (appended) === */
+/* ============================================================
+   Reef Desk — "Ops" theme override
+   ----------------------------------------------------------------
+   Drop this <style> block at the very end of the existing <style>
+   in `Booking engine v4.html` (around line 1040, just before
+   `</style>`). It re-themes the app to the Operational direction:
+     • Neutral Slate/zinc palette (no warm cream)
+     • Geist + Geist Mono typography
+     • Bordered cards, square-ish corners
+     • Default spacing (no density change)
+
+   Nothing structural changes — only colors, fonts, radii. All
+   existing component classes keep working.
+   ============================================================ */
+
+/* 1. Geist + Geist Mono. The original Fraunces/Onest/JetBrains-Mono
+      <link> in <head> can stay; this just adds Geist alongside.
+      If you want to drop the originals to save bytes, replace the
+      existing googleapis link with:
+      https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap
+*/
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+/* 2. Re-theme the design tokens. */
+:root {
+  /* Neutral surface stack — replaces the warm cream */
+  --bg:            #F4F5F7;
+  --card:          #FFFFFF;
+  --surface-2:     #ECEDF0;
+  --border:        #E3E5EA;
+  --border-2:      #ECEDF0;
+  --border-strong: #C9CCD3;
+
+  /* Ink — cool neutral slate, not warm brown */
+  --ink:    #0E1116;
+  --ink-2:  #3B414B;
+  --muted:  #6B7280;
+  --muted-2:#A1A6B0;
+
+  /* Primary — slate blue, less saturated than navy */
+  --primary:      #2A3340;
+  --primary-ink:  #14181F;
+  --primary-soft: #E2E5EB;
+
+  /* Accent — kept restrained for ops feel */
+  --accent:       #6B5BD2;
+  --accent-ink:   #4A3DB1;
+
+  /* Semantic colors — desaturated to fit the neutral palette */
+  --good:     #2F7D5C;
+  --warn:     #A8771E;
+  --warn-soft:#F5E9CD;
+  --bad:      #B33A3F;
+  --bad-soft: #F2DADC;
+
+  --track:    #E3E5EA;
+
+  /* Tighter shadows, square-er corners */
+  --shadow-sm: 0 1px 0 rgba(14, 17, 22, .04);
+  --shadow-md: 0 1px 0 rgba(14, 17, 22, .04), 0 4px 8px -2px rgba(14, 17, 22, .06);
+  --shadow-lg: 0 16px 36px -12px rgba(14, 17, 22, .18), 0 4px 12px -4px rgba(14, 17, 22, .1);
+  --radius:    6px;
+  --radius-sm: 4px;
+  --radius-lg: 10px;
+}
+
+/* 3. Type — Geist body, Geist Mono for numerals.
+      Display headings drop the variable-Fraunces opsz tweak. */
+body {
+  font-family: 'Geist', -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  letter-spacing: -.005em;
+}
+h1, h2, h3, .display {
+  font-family: 'Geist', -apple-system, system-ui, sans-serif;
+  font-weight: 600;
+  font-variation-settings: normal;
+  letter-spacing: -.02em;
+}
+.mono, .num,
+.col-slot, .col-room, .col-pax, .col-bill,
+.exc-cap-text, .result-row .when, .result-row .pax, .result-row .room,
+.guest-card .rooms, .guest-rank-row .rank, .guest-rank-row .count,
+.bar-row .bar-val, .dow-bar .dow-num,
+.btn-badge, .report-row .property, .report-row .meta,
+.stat-card .val {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* 4. Brand mark + brand wordmark — drop italic, keep simple sans */
+.brand-name { font-family: 'Geist', sans-serif; font-weight: 600; }
+.brand-name em { font-style: normal; color: var(--primary); font-weight: 500; }
+.brand-mark {
+  background: linear-gradient(135deg, var(--primary), #1A1F28);
+  border-radius: 5px;
+}
+
+/* 5. Headings inside the app — kill the italics, kill the serif look */
+.day-heading h1, .modal h2, .welcome h1 {
+  font-family: 'Geist', sans-serif;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+.day-heading h1 em, .modal h2 em, .welcome h1 em {
+  font-style: normal; color: var(--primary); font-weight: 600;
+}
+
+/* 6. Date strip — square-er pills, mono day numbers */
+.date-pill { border-radius: 5px; min-width: 50px; }
+.date-pill .day {
+  font-family: 'Geist Mono', monospace;
+  font-weight: 500;
+  font-size: 16px;
+}
+.date-pill .dow { letter-spacing: .08em; }
+
+/* 7. Excursion cards — bordered, slightly tighter rows */
+.exc-card { border-radius: 6px; border-left-width: 3px; }
+.exc-card:hover { box-shadow: var(--shadow-md); }
+
+/* Table headers — flatter, more terminal-feel */
+.exc-table thead th {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+.exc-table tbody tr:hover { background: var(--surface-2); }
+
+/* 8. Result rows + guest cards — sharper corners */
+.result-row { border-radius: 6px; border-left-width: 3px; }
+.guest-card { border-radius: 6px; }
+.guest-card .name { font-family: 'Geist', sans-serif; font-weight: 600; }
+
+/* 9. Stats cards */
+.stat-card { border-radius: 6px; }
+.stat-card .val {
+  font-family: 'Geist Mono', monospace;
+  font-weight: 500;
+}
+
+/* 10. Buttons — slightly smaller radius, tighter weight */
+.btn { border-radius: var(--radius-sm); font-weight: 500; }
+
+/* 11. Status pill — square corners feel */
+.status-pill { border-radius: 4px; }
+
+/* 12. Modal — square-er, less rounded */
+.modal { border-radius: 8px; }
+.modal h2 { font-family: 'Geist', sans-serif; }
+
+/* 13. Welcome card */
+.welcome-card { border-radius: 10px; }
+.welcome h1 { font-family: 'Geist', sans-serif; font-size: 32px; line-height: 1.1; }
+
+/* 14. Toast — square-er */
+.toast { border-radius: 6px; font-family: 'Geist', sans-serif; }
+
+/* 15. Empty state */
+.empty-state h3 { font-family: 'Geist', sans-serif; font-weight: 600; }
+
+/* 16. Inhouse report rows — match the patch already in v4 */
+.report-row { border-radius: 6px; }
+.report-row .property { font-family: 'Geist Mono', monospace; }
+.btn-link-danger { font-family: 'Geist', sans-serif; }
+
+/* 17. Capacity bars — solid color, no gradient */
+.cap-bar-fill { transition: width .25s ease-out; }
+
+/* 18. Day-of-week chart bars in stats — neutral */
+.dow-bar .dow-col-fill { background: var(--ink-2); }
+.bar-row .bar-fill { background: var(--ink-2); }
 </style>
 
 </head>
