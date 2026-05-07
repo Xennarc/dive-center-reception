@@ -1,0 +1,3000 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Reef Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root {
+  --bg: #F4F1EA;
+  --card: #FFFFFF;
+  --surface-2: #EBE6D8;
+  --border: #E2DCCD;
+  --border-2: #EEE9DC;
+  --border-strong: #CFC8B8;
+  --ink: #14181C;
+  --ink-2: #454C57;
+  --muted: #847E72;
+  --muted-2: #B0AA9B;
+  --primary: #1B4965;
+  --primary-ink: #0E2A3B;
+  --primary-soft: #DAE5EE;
+  --accent: #B25538;
+  --accent-ink: #8A3E26;
+  --good: #4A7C59;
+  --warn: #B57820;
+  --warn-soft: #F5E8C9;
+  --bad: #A8313F;
+  --bad-soft: #F1D9DD;
+  --track: #E2DCCD;
+  --shadow-sm: 0 1px 2px rgba(20, 24, 28, .05);
+  --shadow-md: 0 1px 2px rgba(20, 24, 28, .04), 0 4px 12px -4px rgba(20, 24, 28, .08);
+  --shadow-lg: 0 24px 48px -16px rgba(20, 24, 28, .18), 0 8px 16px -8px rgba(20, 24, 28, .1);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+}
+
+- { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+  font-family: ‘Onest’, -apple-system, system-ui, sans-serif;
+  background: var(–bg);
+  color: var(–ink);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  }
+
+h1, h2, h3, .display {
+font-family: ‘Fraunces’, Georgia, serif;
+font-weight: 500;
+font-variation-settings: “opsz” 36;
+letter-spacing: -.015em;
+margin: 0;
+}
+.mono, .num { font-family: ‘JetBrains Mono’, ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+button { font-family: inherit; line-height: 1; }
+input, select, textarea { font-family: inherit; line-height: 1.4; }
+
+/* ===== Header ===== */
+header {
+position: sticky; top: 0; z-index: 50;
+background: var(–bg);
+border-bottom: 1px solid var(–border);
+}
+.bar {
+display: flex; align-items: center; gap: 14px;
+padding: 12px 24px; max-width: 1400px; margin: 0 auto;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark {
+width: 26px; height: 26px; border-radius: 7px;
+background: linear-gradient(135deg, var(–primary), #0c2c40);
+position: relative; flex-shrink: 0;
+}
+.brand-mark::after {
+content: “”; position: absolute; inset: 5.5px;
+border: 1.5px solid rgba(255,255,255,.7);
+border-radius: 3px; border-bottom: none; border-right: none;
+transform: rotate(-30deg);
+}
+.brand-name {
+font-family: ‘Fraunces’, serif; font-size: 18px;
+font-weight: 500; letter-spacing: -.015em;
+}
+.brand-name em { font-style: italic; color: var(–primary); font-weight: 400; }
+.spacer { flex: 1; }
+
+.btn {
+display: inline-flex; align-items: center; gap: 6px;
+font-size: 13px; font-weight: 500;
+padding: 7px 12px; border-radius: var(–radius-sm);
+border: 1px solid var(–border-strong);
+background: var(–card); color: var(–ink);
+cursor: pointer; transition: background .12s, border-color .12s, color .12s;
+white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(–bg); border-color: var(–ink-2); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-primary {
+background: var(–primary); border-color: var(–primary); color: white;
+}
+.btn-primary:hover:not(:disabled) { background: var(–primary-ink); border-color: var(–primary-ink); }
+
+.btn-danger {
+color: var(–bad);
+border-color: var(–border-strong);
+background: var(–card);
+}
+.btn-danger:hover:not(:disabled) {
+background: var(–bad); color: white; border-color: var(–bad);
+}
+
+.btn-icon {
+display: inline-flex; align-items: center; justify-content: center;
+padding: 7px;
+border-radius: var(–radius-sm);
+border: 1px solid transparent;
+background: transparent;
+color: var(–ink-2);
+cursor: pointer;
+transition: background .12s, border-color .12s, color .12s;
+}
+.btn-icon:hover:not(:disabled) {
+background: var(–card);
+border-color: var(–border-strong);
+color: var(–ink);
+}
+.btn-icon:disabled { opacity: .35; cursor: not-allowed; }
+
+.icon { width: 15px; height: 15px; flex-shrink: 0; }
+
+.status-pill {
+display: inline-flex; align-items: center; gap: 6px;
+font-size: 12px; padding: 5px 10px;
+border-radius: 999px; background: var(–card);
+border: 1px solid var(–border-strong); color: var(–ink-2);
+}
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(–good); }
+.status-pill.is-dirty {
+color: var(–warn); border-color: var(–warn); background: var(–warn-soft);
+}
+.status-pill.is-dirty .dot { background: var(–warn); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+/* ===== Date strip (sub-header) ===== */
+.subhead {
+position: sticky; top: 51px; z-index: 40;
+background: var(–bg);
+border-bottom: 1px solid var(–border);
+}
+.date-strip-wrap {
+max-width: 1400px; margin: 0 auto;
+padding: 9px 24px;
+display: flex; align-items: center; gap: 6px;
+}
+.date-strip {
+flex: 1; display: flex; gap: 4px;
+overflow-x: auto; scroll-behavior: smooth;
+padding: 2px 0; scrollbar-width: none;
+}
+.date-strip::-webkit-scrollbar { display: none; }
+.date-pill {
+flex-shrink: 0;
+display: flex; flex-direction: column;
+align-items: center; justify-content: center; gap: 2px;
+min-width: 56px; padding: 6px 10px;
+border-radius: 8px; border: 1px solid transparent;
+background: transparent; cursor: pointer;
+transition: background .12s, border-color .12s;
+position: relative;
+}
+.date-pill:hover { background: var(–card); border-color: var(–border); }
+.date-pill .dow {
+font-size: 10px; font-weight: 600;
+color: var(–muted); text-transform: uppercase;
+letter-spacing: .06em;
+}
+.date-pill .day {
+font-family: ‘Fraunces’, serif; font-size: 18px;
+font-weight: 500; color: var(–ink); line-height: 1;
+}
+.date-pill .has-data {
+position: absolute; bottom: 3px;
+width: 4px; height: 4px; border-radius: 50%;
+background: var(–muted-2);
+}
+.date-pill.is-today:not(.is-active) { background: var(–card); border-color: var(–border-strong); }
+.date-pill.is-today .day { color: var(–primary); }
+.date-pill.is-active { background: var(–primary); border-color: var(–primary); }
+.date-pill.is-active .dow { color: rgba(255, 255, 255, .82); }
+.date-pill.is-active .day { color: white; }
+.date-pill.is-active .has-data { background: rgba(255, 255, 255, .85); }
+.date-pill.month-divider { padding-left: 18px; }
+.date-pill.month-divider::before {
+content: attr(data-month);
+position: absolute; left: -2px; top: 50%; transform: translateY(-50%);
+writing-mode: vertical-rl; rotate: 180deg;
+font-size: 9px; font-weight: 600;
+color: var(–muted-2); text-transform: uppercase;
+letter-spacing: .1em;
+}
+
+/* ===== Toolbar ===== */
+main { max-width: 1400px; margin: 0 auto; padding: 20px 24px 80px; }
+.toolbar {
+display: flex; gap: 8px; align-items: center;
+margin-bottom: 22px; flex-wrap: wrap;
+}
+.toolbar select, .toolbar input[type=“text”] {
+height: 34px; padding: 0 10px;
+border-radius: var(–radius-sm);
+border: 1px solid var(–border-strong);
+background: var(–card); color: var(–ink);
+font-size: 13px; outline: none;
+transition: all .12s;
+}
+.toolbar select {
+padding-right: 28px; appearance: none; cursor: pointer;
+background-image: url(“data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238A8478' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>”);
+background-repeat: no-repeat; background-position: right 10px center;
+}
+.toolbar input:focus, .toolbar select:focus {
+border-color: var(–primary);
+box-shadow: 0 0 0 3px rgba(27, 73, 101, .12);
+}
+.search-wrap { position: relative; }
+.search-input {
+width: 280px; padding-left: 34px !important;
+background-image: url(“data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A8478' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/></svg>”);
+background-repeat: no-repeat; background-position: 11px center;
+}
+.search-clear {
+position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+border: none; background: transparent; cursor: pointer;
+color: var(–muted); padding: 4px; border-radius: 4px;
+display: none;
+}
+.search-clear.is-visible { display: flex; }
+.search-clear:hover { background: rgba(20, 24, 28, .06); color: var(–ink); }
+
+.seg {
+display: inline-flex; gap: 2px;
+background: var(–surface-2);
+border-radius: 8px; padding: 3px;
+}
+.seg-btn {
+font-size: 12px; font-weight: 500;
+padding: 5px 11px; border-radius: 6px;
+border: none; background: transparent;
+color: var(–ink-2); cursor: pointer;
+transition: all .12s;
+}
+.seg-btn:hover { color: var(–ink); }
+.seg-btn.is-active { background: var(–card); color: var(–ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+/* ===== Day heading ===== */
+.day-heading {
+display: flex; align-items: baseline;
+gap: 18px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.day-heading h1 { font-size: 30px; line-height: 1.1; font-weight: 500; }
+.day-heading h1 em { font-style: italic; color: var(–primary); font-weight: 400; }
+.day-summary { color: var(–muted); font-size: 13px; }
+.day-summary strong { color: var(–ink-2); font-weight: 500; }
+
+/* ===== Excursion cards ===== */
+.agenda { display: flex; flex-direction: column; gap: 12px; }
+.exc-card {
+background: var(–card);
+border: 1px solid var(–border);
+border-left: 4px solid var(–exc-color, var(–primary));
+border-radius: var(–radius);
+overflow: hidden;
+box-shadow: var(–shadow-sm);
+transition: box-shadow .15s;
+}
+.exc-card:hover { box-shadow: var(–shadow-md); }
+.exc-head {
+display: flex; align-items: center; gap: 16px;
+padding: 14px 18px; flex-wrap: wrap;
+border-bottom: 1px solid var(–border-2);
+}
+.exc-name {
+font-size: 15px; font-weight: 600;
+color: var(–ink); flex: 1; min-width: 150px;
+}
+.exc-cap { display: flex; align-items: center; gap: 10px; }
+.exc-cap-text {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 12px; color: var(–muted); white-space: nowrap;
+}
+.exc-cap-text strong { color: var(–ink); font-weight: 600; }
+.cap-bar {
+width: 90px; height: 5px;
+background: var(–track);
+border-radius: 3px; overflow: hidden;
+}
+.cap-bar-fill { height: 100%; background: var(–exc-color, var(–primary)); transition: width .3s; }
+.cap-bar-fill.is-warn { background: var(–warn); }
+.cap-bar-fill.is-full { background: var(–bad); }
+
+table.exc-table {
+width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.exc-table thead th {
+font-size: 10px; text-transform: uppercase;
+letter-spacing: .08em; font-weight: 600;
+color: var(–muted); padding: 9px 14px;
+text-align: left; background: var(–bg);
+white-space: nowrap;
+}
+.exc-table thead th.num-col { text-align: right; }
+.exc-table tbody td {
+padding: 10px 14px;
+border-bottom: 1px solid var(–border-2);
+vertical-align: middle;
+}
+.exc-table tbody tr { cursor: pointer; transition: background .1s; }
+.exc-table tbody tr:hover { background: var(–bg); }
+.exc-table tbody tr:last-child td { border-bottom: none; }
+.col-slot { width: 36px; color: var(–muted-2); font-family: ‘JetBrains Mono’, monospace; font-size: 11px; }
+.col-room { width: 100px; font-family: ‘JetBrains Mono’, monospace; font-size: 12px; color: var(–ink-2); }
+.col-guest { font-weight: 500; }
+.col-pax { font-family: ‘JetBrains Mono’, monospace; font-size: 12px; text-align: right; width: 56px; }
+.col-bill { width: 90px; font-family: ‘JetBrains Mono’, monospace; font-size: 11px; color: var(–muted); }
+.col-remarks { font-size: 12px; color: var(–muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-staff { font-size: 12px; color: var(–ink-2); }
+
+.empty-card-body {
+padding: 24px 20px; text-align: center;
+color: var(–muted); font-size: 13px;
+}
+.exc-add-row {
+padding: 8px 14px;
+border-top: 1px dashed var(–border);
+background: var(–bg);
+}
+.exc-add-row .btn {
+font-size: 12px; padding: 5px 10px;
+color: var(–ink-2); border-color: transparent;
+background: transparent;
+}
+.exc-add-row .btn:hover { background: var(–card); border-color: var(–border-strong); color: var(–ink); }
+
+/* ===== Search results ===== */
+.results { display: flex; flex-direction: column; gap: 8px; }
+.result-row {
+background: var(–card);
+border: 1px solid var(–border);
+border-left: 4px solid var(–exc-color, var(–primary));
+border-radius: 8px;
+padding: 12px 16px;
+display: grid;
+grid-template-columns: 110px 1fr 1.4fr 70px 100px;
+gap: 16px; align-items: center;
+cursor: pointer; transition: all .12s;
+}
+.result-row:hover { box-shadow: var(–shadow-md); border-left-color: var(–exc-color, var(–primary)); }
+.result-row .when { font-family: ‘JetBrains Mono’, monospace; font-size: 12px; color: var(–muted); }
+.result-row .when strong { color: var(–ink-2); display: block; font-family: ‘Fraunces’, serif; font-size: 14px; font-weight: 500; }
+.result-row .who { font-weight: 500; }
+.result-row .what { color: var(–ink-2); font-size: 13px; }
+.result-row .pax { font-family: ‘JetBrains Mono’, monospace; font-size: 12px; text-align: right; color: var(–ink-2); }
+.result-row .room { font-family: ‘JetBrains Mono’, monospace; font-size: 11px; color: var(–muted); }
+
+/* ===== Guest cards ===== */
+.guest-card {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: var(–radius);
+padding: 14px 18px;
+margin-bottom: 8px;
+cursor: pointer;
+transition: all .12s;
+}
+.guest-card:hover { box-shadow: var(–shadow-md); border-color: var(–border-strong); }
+.guest-card-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.guest-card .name { font-family: ‘Fraunces’, serif; font-size: 19px; font-weight: 500; }
+.guest-card .rooms { font-family: ‘JetBrains Mono’, monospace; color: var(–muted); font-size: 12px; }
+.guest-card .count {
+margin-left: auto; font-size: 11px;
+color: var(–ink-2); background: var(–bg);
+padding: 3px 8px; border-radius: 6px; font-weight: 500;
+}
+.guest-card .meta {
+margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;
+}
+.guest-card .chip {
+display: inline-flex; align-items: center; gap: 6px;
+background: var(–bg); border-radius: 5px;
+padding: 3px 8px; font-size: 11px; color: var(–ink-2);
+}
+.guest-card .chip .swatch { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ===== Welcome ===== */
+.welcome {
+display: grid; place-items: center;
+min-height: calc(100vh - 60px);
+padding: 40px 24px;
+}
+.welcome-card {
+max-width: 520px; text-align: center;
+padding: 40px 36px;
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: var(–radius-lg);
+box-shadow: var(–shadow-md);
+}
+.welcome h1 { font-size: 34px; line-height: 1.05; margin-bottom: 12px; }
+.welcome h1 em { font-style: italic; color: var(–primary); font-weight: 400; }
+.welcome p { color: var(–ink-2); font-size: 14px; margin: 0 0 24px; }
+.welcome-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.welcome-actions .btn { padding: 10px 16px; font-size: 14px; }
+.welcome small { display: block; margin-top: 22px; font-size: 12px; color: var(–muted); line-height: 1.5; }
+
+/* ===== Empty state ===== */
+.empty-state {
+background: var(–card);
+border: 1px dashed var(–border-strong);
+border-radius: var(–radius);
+padding: 60px 20px; text-align: center;
+}
+.empty-state h3 {
+font-family: ‘Fraunces’, serif; font-size: 20px;
+color: var(–ink-2); margin-bottom: 6px; font-weight: 500;
+}
+.empty-state p { color: var(–muted); font-size: 13px; max-width: 340px; margin: 0 auto; }
+
+/* ===== Modal ===== */
+.modal-bg {
+position: fixed;
+top: 0; right: 0; bottom: 0; left: 0;
+z-index: 200;
+background: rgba(12, 16, 22, .62);
+display: flex; align-items: center; justify-content: center;
+padding: 24px; animation: fadein .15s ease;
+overflow-y: auto;
+}
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+background: var(–card);
+border-radius: var(–radius-lg);
+width: 100%; max-width: 540px;
+max-height: 92vh; overflow-y: auto;
+box-shadow: var(–shadow-lg);
+animation: pop .18s cubic-bezier(.2,.8,.2,1.05);
+border: 1px solid var(–border);
+}
+@keyframes pop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal h2 {
+font-size: 20px; font-weight: 500;
+padding: 22px 24px 4px; line-height: 1.2;
+}
+.modal h2 em { font-style: italic; color: var(–primary); }
+.modal .sub { padding: 0 24px 16px; color: var(–muted); font-size: 13px; }
+.modal .body { padding: 0 24px; }
+.modal .foot {
+padding: 14px 24px 18px; display: flex; gap: 8px;
+justify-content: flex-end; border-top: 1px solid var(–border);
+margin-top: 14px; flex-wrap: wrap;
+}
+
+.field { margin-bottom: 14px; }
+.field label {
+display: block; font-size: 11px;
+text-transform: uppercase; letter-spacing: .08em;
+color: var(–muted); margin-bottom: 5px; font-weight: 600;
+}
+.field input, .field select, .field textarea {
+width: 100%; height: 36px; padding: 0 12px;
+border-radius: var(–radius-sm);
+border: 1px solid var(–border-strong);
+background: var(–card); color: var(–ink);
+font-size: 13px; outline: none;
+transition: all .12s;
+}
+.field select {
+appearance: none; padding-right: 32px; cursor: pointer;
+background-image: url(“data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238A8478' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>”);
+background-repeat: no-repeat; background-position: right 12px center;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+border-color: var(–primary);
+box-shadow: 0 0 0 3px rgba(27, 73, 101, .12);
+}
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field-help { font-size: 12px; color: var(–muted); margin-top: 6px; min-height: 18px; }
+.field-help.is-good { color: var(–good); }
+.field-help.is-warn { color: var(–bad); }
+
+.modal-context-banner {
+margin: 0 24px 16px;
+padding: 10px 12px;
+background: var(–primary-soft);
+border-radius: var(–radius-sm);
+font-size: 12px;
+color: var(–primary-ink);
+display: flex; align-items: center; gap: 8px;
+}
+.modal-context-banner .swatch {
+width: 8px; height: 8px; border-radius: 50%;
+background: var(–exc-color, var(–primary));
+}
+
+/* ===== Toast ===== */
+.toast {
+position: fixed; bottom: 24px; left: 50%;
+transform: translateX(-50%);
+background: var(–ink); color: white;
+padding: 11px 18px; border-radius: 8px;
+font-size: 13px; z-index: 300;
+box-shadow: 0 12px 32px rgba(0,0,0,.25);
+animation: toastin .2s cubic-bezier(.2,.8,.2,1.1);
+display: flex; align-items: center; gap: 8px;
+}
+.toast.is-error { background: var(–bad); }
+.toast.is-success { background: var(–good); }
+@keyframes toastin { from { transform: translate(-50%, 8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+/* ===== Stats dashboard ===== */
+.stats-grid {
+display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 10px;
+margin-bottom: 14px;
+}
+.stat-card {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: var(–radius);
+padding: 14px 16px;
+box-shadow: var(–shadow-sm);
+}
+.stat-card .lbl {
+font-size: 10px; text-transform: uppercase;
+letter-spacing: .12em; color: var(–muted); font-weight: 600;
+}
+.stat-card .val {
+font-family: ‘Fraunces’, serif;
+font-size: 30px; line-height: 1.05;
+margin-top: 6px; font-weight: 500;
+font-variant-numeric: tabular-nums;
+}
+.stat-card .sub { font-size: 11px; color: var(–muted); margin-top: 3px; }
+
+.dash-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; }
+.dash-section {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: var(–radius);
+padding: 18px 20px;
+margin-bottom: 12px;
+box-shadow: var(–shadow-sm);
+}
+.dash-section.full { grid-column: 1 / -1; }
+.dash-section h3 {
+font-family: ‘Onest’, sans-serif; font-weight: 600;
+color: var(–ink-2); margin-bottom: 14px;
+text-transform: uppercase; letter-spacing: .08em; font-size: 11px;
+}
+
+.bar-chart { display: flex; flex-direction: column; gap: 12px; }
+.bar-row {
+display: grid;
+grid-template-columns: 1fr 90px;
+gap: 10px 12px;
+align-items: center;
+font-size: 13px;
+}
+.bar-row .bar-label {
+color: var(–ink-2);
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+display: flex; align-items: center; gap: 8px;
+}
+.bar-row .bar-label .swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.bar-row .bar-track {
+height: 6px;
+background: var(–track);
+border-radius: 3px;
+overflow: hidden;
+grid-column: 1 / -1;
+}
+.bar-row .bar-fill { height: 100%; background: var(–bar-color, var(–primary)); border-radius: 3px; transition: width .4s; }
+.bar-row .bar-val {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 12px;
+color: var(–ink-2);
+text-align: right;
+white-space: nowrap;
+}
+
+.dow-chart {
+display: grid;
+grid-template-columns: repeat(7, 1fr);
+gap: 8px;
+height: 130px;
+align-items: end;
+}
+.dow-bar {
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 4px;
+height: 100%;
+justify-content: flex-end;
+}
+.dow-bar .dow-col {
+width: 100%; flex: 1;
+background: var(–track);
+border-radius: 4px;
+position: relative;
+overflow: hidden;
+min-height: 4px;
+}
+.dow-bar .dow-col-fill {
+position: absolute; bottom: 0; left: 0; right: 0;
+background: var(–primary);
+border-radius: 4px;
+transition: height .4s;
+}
+.dow-bar .dow-lbl { font-size: 10px; color: var(–muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.dow-bar .dow-num { font-family: ‘JetBrains Mono’, monospace; font-size: 11px; color: var(–ink-2); }
+
+.guest-rank { display: flex; flex-direction: column; gap: 4px; }
+.guest-rank-row {
+display: grid;
+grid-template-columns: 24px 1fr auto;
+gap: 12px; align-items: center;
+padding: 7px 10px;
+border-radius: 6px;
+cursor: pointer;
+transition: background .12s;
+}
+.guest-rank-row:hover { background: var(–bg); }
+.guest-rank-row .rank { font-family: ‘JetBrains Mono’, monospace; font-size: 11px; color: var(–muted-2); }
+.guest-rank-row .name { font-weight: 500; font-size: 13px; }
+.guest-rank-row .count {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 12px; color: var(–muted);
+background: var(–bg);
+padding: 2px 8px;
+border-radius: 999px;
+}
+
+.dash-empty {
+text-align: center; color: var(–muted);
+padding: 18px; font-size: 13px; font-style: italic;
+}
+
+/* ===== Inhouse reports ===== */
+.btn-with-badge { position: relative; }
+.btn-badge {
+display: inline-flex; align-items: center; justify-content: center;
+min-width: 18px; height: 18px;
+border-radius: 9px;
+background: var(–primary); color: white;
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 10px; font-weight: 600;
+padding: 0 5px;
+margin-left: 4px;
+}
+.btn-badge.is-stale { background: var(–warn); }
+
+.upload-zone {
+border: 2px dashed var(–border-strong);
+border-radius: var(–radius);
+padding: 28px 20px;
+text-align: center; cursor: pointer;
+transition: all .15s;
+background: var(–bg);
+}
+.upload-zone:hover {
+border-color: var(–primary);
+background: var(–primary-soft);
+}
+.upload-zone.is-drag {
+border-color: var(–primary);
+background: var(–primary-soft);
+border-style: solid;
+}
+.upload-zone .icon-large {
+width: 28px; height: 28px;
+color: var(–primary);
+margin: 0 auto 8px;
+display: block;
+}
+.upload-zone strong { font-weight: 600; color: var(–ink); display: block; font-size: 14px; }
+.upload-zone small { color: var(–muted); font-size: 12px; display: block; margin-top: 4px; }
+
+.report-list { margin-top: 16px; }
+.report-row {
+display: grid;
+grid-template-columns: 60px 1fr auto auto;
+gap: 10px; align-items: center;
+padding: 10px 12px;
+border: 1px solid var(–border-2);
+border-radius: 8px;
+margin-bottom: 6px;
+font-size: 13px;
+background: var(–card);
+}
+.report-row .property {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 11px; font-weight: 600;
+padding: 3px 6px; border-radius: 4px;
+background: var(–primary-soft); color: var(–primary-ink);
+text-align: center;
+}
+.report-row .name { color: var(–ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.report-row .meta { color: var(–muted); font-size: 11px; font-family: ‘JetBrains Mono’, monospace; white-space: nowrap; }
+.report-row .remove {
+color: var(–muted); cursor: pointer;
+padding: 4px 6px; border-radius: 4px;
+border: none; background: transparent;
+}
+.report-row .remove:hover { background: var(–bad); color: white; }
+.report-row.is-failed { background: var(–bad-soft); border-color: var(–bad); }
+.report-row.is-failed .property { background: rgba(168, 49, 63, .18); color: var(–bad); }
+.report-row.is-failed .meta { color: var(–bad); }
+.report-row.is-warned { background: var(–warn-soft); border-color: var(–warn); }
+.report-row.is-warned .property { background: rgba(181, 120, 32, .18); color: var(–warn); }
+.report-row.is-warned .meta { color: var(–warn); white-space: normal; }
+
+.parse-progress {
+display: flex; align-items: center; gap: 8px;
+font-size: 12px; color: var(–muted);
+padding: 8px 0;
+}
+.spinner {
+width: 14px; height: 14px;
+border: 2px solid var(–border-strong);
+border-top-color: var(–primary);
+border-radius: 50%;
+animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.field-help.is-info { color: var(–primary); font-weight: 500; }
+
+@media (max-width: 720px) {
+.stats-grid { grid-template-columns: repeat(2, 1fr); }
+.dash-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+.bar { padding: 10px 16px; }
+.date-strip-wrap, main { padding-left: 16px; padding-right: 16px; }
+.search-input { width: 100%; }
+.search-wrap { flex: 1 1 100%; }
+.field-row, .field-row-3 { grid-template-columns: 1fr; }
+.day-heading h1 { font-size: 22px; }
+.result-row { grid-template-columns: 90px 1fr; gap: 6px 12px; }
+.result-row .what, .result-row .pax, .result-row .room { grid-column: 1 / -1; }
+.col-bill, .col-remarks, .col-staff { display: none; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(–border-strong); border-radius: 10px; border: 2px solid var(–bg); }
+
+/* === Ops theme override (appended) === */
+/* ============================================================
+   Reef Desk — "Ops" theme override
+   ----------------------------------------------------------------
+   Drop this <style> block at the very end of the existing <style>
+   in `Booking engine v4.html` (around line 1040, just before
+   `</style>`). It re-themes the app to the Operational direction:
+     • Neutral Slate/zinc palette (no warm cream)
+     • Geist + Geist Mono typography
+     • Bordered cards, square-ish corners
+     • Default spacing (no density change)
+
+   Nothing structural changes — only colors, fonts, radii. All
+   existing component classes keep working.
+   ============================================================ */
+
+/* 1. Geist + Geist Mono. The original Fraunces/Onest/JetBrains-Mono
+      <link> in <head> can stay; this just adds Geist alongside.
+      If you want to drop the originals to save bytes, replace the
+      existing googleapis link with:
+      https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap
+*/
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+/* 2. Re-theme the design tokens. */
+:root {
+  /* Neutral surface stack — replaces the warm cream */
+  --bg:            #F4F5F7;
+  --card:          #FFFFFF;
+  --surface-2:     #ECEDF0;
+  --border:        #E3E5EA;
+  --border-2:      #ECEDF0;
+  --border-strong: #C9CCD3;
+
+  /* Ink — cool neutral slate, not warm brown */
+  --ink:    #0E1116;
+  --ink-2:  #3B414B;
+  --muted:  #6B7280;
+  --muted-2:#A1A6B0;
+
+  /* Primary — slate blue, less saturated than navy */
+  --primary:      #2A3340;
+  --primary-ink:  #14181F;
+  --primary-soft: #E2E5EB;
+
+  /* Accent — kept restrained for ops feel */
+  --accent:       #6B5BD2;
+  --accent-ink:   #4A3DB1;
+
+  /* Semantic colors — desaturated to fit the neutral palette */
+  --good:     #2F7D5C;
+  --warn:     #A8771E;
+  --warn-soft:#F5E9CD;
+  --bad:      #B33A3F;
+  --bad-soft: #F2DADC;
+
+  --track:    #E3E5EA;
+
+  /* Tighter shadows, square-er corners */
+  --shadow-sm: 0 1px 0 rgba(14, 17, 22, .04);
+  --shadow-md: 0 1px 0 rgba(14, 17, 22, .04), 0 4px 8px -2px rgba(14, 17, 22, .06);
+  --shadow-lg: 0 16px 36px -12px rgba(14, 17, 22, .18), 0 4px 12px -4px rgba(14, 17, 22, .1);
+  --radius:    6px;
+  --radius-sm: 4px;
+  --radius-lg: 10px;
+}
+
+/* 3. Type — Geist body, Geist Mono for numerals.
+      Display headings drop the variable-Fraunces opsz tweak. */
+body {
+  font-family: 'Geist', -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  letter-spacing: -.005em;
+}
+h1, h2, h3, .display {
+  font-family: 'Geist', -apple-system, system-ui, sans-serif;
+  font-weight: 600;
+  font-variation-settings: normal;
+  letter-spacing: -.02em;
+}
+.mono, .num,
+.col-slot, .col-room, .col-pax, .col-bill,
+.exc-cap-text, .result-row .when, .result-row .pax, .result-row .room,
+.guest-card .rooms, .guest-rank-row .rank, .guest-rank-row .count,
+.bar-row .bar-val, .dow-bar .dow-num,
+.btn-badge, .report-row .property, .report-row .meta,
+.stat-card .val {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* 4. Brand mark + brand wordmark — drop italic, keep simple sans */
+.brand-name { font-family: 'Geist', sans-serif; font-weight: 600; }
+.brand-name em { font-style: normal; color: var(--primary); font-weight: 500; }
+.brand-mark {
+  background: linear-gradient(135deg, var(--primary), #1A1F28);
+  border-radius: 5px;
+}
+
+/* 5. Headings inside the app — kill the italics, kill the serif look */
+.day-heading h1, .modal h2, .welcome h1 {
+  font-family: 'Geist', sans-serif;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+.day-heading h1 em, .modal h2 em, .welcome h1 em {
+  font-style: normal; color: var(--primary); font-weight: 600;
+}
+
+/* 6. Date strip — square-er pills, mono day numbers */
+.date-pill { border-radius: 5px; min-width: 50px; }
+.date-pill .day {
+  font-family: 'Geist Mono', monospace;
+  font-weight: 500;
+  font-size: 16px;
+}
+.date-pill .dow { letter-spacing: .08em; }
+
+/* 7. Excursion cards — bordered, slightly tighter rows */
+.exc-card { border-radius: 6px; border-left-width: 3px; }
+.exc-card:hover { box-shadow: var(--shadow-md); }
+
+/* Table headers — flatter, more terminal-feel */
+.exc-table thead th {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+.exc-table tbody tr:hover { background: var(--surface-2); }
+
+/* 8. Result rows + guest cards — sharper corners */
+.result-row { border-radius: 6px; border-left-width: 3px; }
+.guest-card { border-radius: 6px; }
+.guest-card .name { font-family: 'Geist', sans-serif; font-weight: 600; }
+
+/* 9. Stats cards */
+.stat-card { border-radius: 6px; }
+.stat-card .val {
+  font-family: 'Geist Mono', monospace;
+  font-weight: 500;
+}
+
+/* 10. Buttons — slightly smaller radius, tighter weight */
+.btn { border-radius: var(--radius-sm); font-weight: 500; }
+
+/* 11. Status pill — square corners feel */
+.status-pill { border-radius: 4px; }
+
+/* 12. Modal — square-er, less rounded */
+.modal { border-radius: 8px; }
+.modal h2 { font-family: 'Geist', sans-serif; }
+
+/* 13. Welcome card */
+.welcome-card { border-radius: 10px; }
+.welcome h1 { font-family: 'Geist', sans-serif; font-size: 32px; line-height: 1.1; }
+
+/* 14. Toast — square-er */
+.toast { border-radius: 6px; font-family: 'Geist', sans-serif; }
+
+/* 15. Empty state */
+.empty-state h3 { font-family: 'Geist', sans-serif; font-weight: 600; }
+
+/* 16. Inhouse report rows — match the patch already in v4 */
+.report-row { border-radius: 6px; }
+.report-row .property { font-family: 'Geist Mono', monospace; }
+.btn-link-danger { font-family: 'Geist', sans-serif; }
+
+/* 17. Capacity bars — solid color, no gradient */
+.cap-bar-fill { transition: width .25s ease-out; }
+
+/* 18. Day-of-week chart bars in stats — neutral */
+.dow-bar .dow-col-fill { background: var(--ink-2); }
+.bar-row .bar-fill { background: var(--ink-2); }
+
+</style>
+
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">Reef <em>Desk</em></div>
+    </div>
+    <div class="spacer"></div>
+    <div id="status-area" style="display:none; gap: 6px; align-items:center;">
+      <span id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">Ready</span></span>
+      <button id="btn-reload" class="btn-icon" title="Reload from disk">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      </button>
+      <button id="btn-save" class="btn btn-primary" disabled>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save
+      </button>
+    </div>
+  </div>
+</header>
+
+<div id="subhead" class="subhead" style="display:none">
+  <div class="date-strip-wrap">
+    <button id="btn-strip-prev" class="btn-icon" title="Earlier">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div id="date-strip" class="date-strip"></div>
+    <button id="btn-strip-next" class="btn-icon" title="Later">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    <button id="btn-today" class="btn">Today</button>
+  </div>
+</div>
+
+<main id="app">
+  <section class="welcome" id="welcome">
+    <div class="welcome-card">
+      <h1>One <em>desk</em>.<br>Every excursion booking.</h1>
+      <p>Open the shared folder containing your monthly booking sheets — Reef Desk parses every excursion and date into a single searchable view. Add, edit, or cancel bookings, and write changes back to the original Excel files.</p>
+      <div class="welcome-actions">
+        <button id="btn-open-folder" class="btn btn-primary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Open shared folder
+        </button>
+        <button id="btn-open-files" class="btn">Pick files manually</button>
+      </div>
+      <small>Files never leave your browser. Folder access requires Chrome, Edge, or another Chromium browser opened directly.</small>
+    </div>
+  </section>
+
+  <section id="workspace" style="display:none;">
+    <div class="toolbar">
+      <div class="seg" role="tablist">
+        <button class="seg-btn is-active" data-mode="agenda">Agenda</button>
+        <button class="seg-btn" data-mode="people">Guests</button>
+        <button class="seg-btn" data-mode="stats">Stats</button>
+      </div>
+      <select id="filter-excursion">
+        <option value="">All excursions</option>
+      </select>
+      <div class="search-wrap">
+        <input id="search" type="text" class="search-input" placeholder="Search guest, room, bill, remark…" />
+        <button id="search-clear" class="search-clear" title="Clear">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="spacer" style="flex:1"></div>
+      <button id="btn-inhouse" class="btn btn-with-badge" title="Manage inhouse reports">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        Reports<span id="inhouse-badge" class="btn-badge" style="display:none">0</span>
+      </button>
+      <button id="btn-add" class="btn btn-primary">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        New booking
+      </button>
+    </div>
+    <div id="view-container"></div>
+  </section>
+</main>
+
+<div id="modal-mount"></div>
+<div id="toast-mount"></div>
+<input type="file" id="file-input" multiple accept=".xlsx" style="display:none;" />
+<input type="file" id="pdf-input" multiple accept=".pdf,application/pdf" style="display:none;" />
+
+<script>
+/* ============================================================
+   Reef Desk — unified booking interface (ExcelJS edition)
+   ============================================================ */
+
+if (window.pdfjsLib) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+const STATE = {
+  mode: 'fs',                // 'fs' | 'fp' (file source mode)
+  view: 'agenda',            // 'agenda' | 'people' | 'stats'
+  dirHandle: null,
+  files: [],
+  bookings: [],
+  excursions: [],
+  excFilter: '',
+  search: '',
+  selectedDate: null,        // ISO
+  inhouseGuests: [],         // [{room, name, arrival, departure, property, businessDate, sourceFile}]
+  inhouseReports: [],        // [{filename, property, businessDate, guestCount, error?}]
+};
+
+const PALETTE = ['#1B4965','#3D6975','#4A7C59','#856437','#A85A4A','#5E5081','#9C7A2C','#3A7866','#6B5070','#7A4E3A'];
+function colorFor(idx){ return PALETTE[idx % PALETTE.length]; }
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+function el(tag, attrs={}, ...children){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (k === 'class') e.className = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    e.append(c.nodeType ? c : document.createTextNode(c));
+  }
+  return e;
+}
+function toast(msg, kind=''){
+  const t = el('div', {class: 'toast ' + (kind === 'error' ? 'is-error' : kind === 'success' ? 'is-success' : '')}, msg);
+  $('#toast-mount').append(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .2s'; }, 2400);
+  setTimeout(()=> t.remove(), 2700);
+}
+
+/* ============================================================
+   Date helpers
+   ============================================================ */
+function pad2(n){ return String(n).padStart(2,'0'); }
+function isoFromParts(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
+function parseDateValue(v) {
+  if (v == null) return null;
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return null;
+    return isoFromParts(v.getFullYear(), v.getMonth()+1, v.getDate());
+  }
+  if (typeof v === 'object' && v.result instanceof Date) return parseDateValue(v.result);
+  if (typeof v === 'object' && typeof v.result === 'string') return parseDateValue(v.result);
+  if (typeof v === 'object' && v.text) return parseDateValue(v.text);
+  if (typeof v === 'number') {
+    if (v > 25569) {
+      const ms = (v - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      return isoFromParts(d.getFullYear(), d.getMonth()+1, d.getDate());
+    }
+  }
+  if (typeof v === 'string') {
+    const s = v.trim();
+    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return isoFromParts(+m[3], +m[2], +m[1]);
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) return isoFromParts(+m[1], +m[2], +m[3]);
+  }
+  return null;
+}
+function fmtDateShort(iso){
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  return dt.toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
+}
+function fmtDateLong(iso){
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  return dt.toLocaleDateString(undefined, {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+}
+function fmtDayOfWeek(iso){
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString(undefined, {weekday: 'short'});
+}
+function fmtMonth(iso){
+  const [y,m] = iso.split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleDateString(undefined, {month: 'short'});
+}
+function todayISO(){ const t = new Date(); return isoFromParts(t.getFullYear(), t.getMonth()+1, t.getDate()); }
+
+/* ============================================================
+   Cell helpers
+   ============================================================ */
+function cellRaw(cell) {
+  if (!cell) return null;
+  const v = cell.value;
+  if (v == null) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v !== 'object') return v;
+  if ('result' in v) {
+    if (v.result == null) return null;
+    if (v.result instanceof Date && isNaN(v.result.getTime())) return null;
+    if (typeof v.result === 'object' && 'error' in v.result) return null;
+    return v.result;
+  }
+  if (v.richText) return v.richText.map(t => t.text).join('');
+  if (v.text) return v.text;
+  if (v.error) return null;
+  return null;
+}
+function cellStr(cell) {
+  const v = cellRaw(cell);
+  if (v == null) return '';
+  if (v instanceof Date) return v.toISOString();
+  return String(v).trim();
+}
+function cellNum(cell) {
+  const v = cellRaw(cell);
+  if (v == null) return null;
+  if (typeof v === 'string' && v.trim() === '') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+/* ============================================================
+   Layout detection
+   ============================================================ */
+const HEADER_KEYS = {
+  room:      [/^room/i, /^cabin/i],
+  guest:     [/guest\s*name/i, /^name$/i],
+  departure: [/^departure/i, /check.?out/i],
+  adults:    [/^adults?$/i, /^pax$/i],
+  child:     [/^child(ren)?$/i, /^kids?$/i],
+  liability: [/^liability/i],
+  billNo:    [/^bill\s*no/i, /^bill$/i, /^folio/i, /^check/i],
+  remarks:   [/^remarks?/i, /^notes?/i, /comment/i],
+  staff:     [/^staff/i, /^crew/i, /^guide/i],
+};
+function classifyHeader(text) {
+  if (!text) return null;
+  const t = String(text).trim();
+  for (const [key, patterns] of Object.entries(HEADER_KEYS)) {
+    for (const p of patterns) if (p.test(t)) return key;
+  }
+  return null;
+}
+function snapshotRows(ws, maxRow = 25) {
+  const out = []; out[0] = [];
+  for (let r = 1; r <= maxRow; r++) {
+    const row = ws.getRow(r);
+    const cells = [null];
+    const colCount = Math.max(row.cellCount, ws.actualColumnCount || 0, 12);
+    for (let c = 1; c <= colCount; c++) cells[c] = cellRaw(row.getCell(c));
+    out[r] = cells;
+  }
+  return out;
+}
+function detectLayout(ws) {
+  const rows = snapshotRows(ws, Math.min(ws.actualRowCount || 30, 30));
+
+  let headerRow = -1, layout = null;
+  for (let r = 1; r <= Math.min(rows.length-1, 20); r++) {
+    const cells = rows[r] || [];
+    let hasRoom = false, hasGuest = false;
+    const map = {};
+    for (let c = 1; c < cells.length; c++) {
+      const k = classifyHeader(cells[c]);
+      if (k) { map[k] = c; }
+      if (k === 'room') hasRoom = true;
+      if (k === 'guest') hasGuest = true;
+    }
+    if (hasRoom && hasGuest) { headerRow = r; layout = map; break; }
+  }
+  if (headerRow < 0) return null;
+
+  let title = '';
+  for (let r = Math.max(1, headerRow - 6); r < headerRow; r++) {
+    const cells = rows[r] || [];
+    for (let c = 1; c < cells.length; c++) {
+      const v = cells[c];
+      if (typeof v === 'string' && v.length > 5 && /[A-Z]/.test(v)
+          && !/note\s*:/i.test(v) && !/^\s*date/i.test(v)) {
+        if (/MAX\s*\d+\s*(PAX|PER)/i.test(v) || /USD\$/i.test(v)
+            || /excursion|dolphin|fishing|snorkel|island|night|reef|orientation|cruise/i.test(v)) {
+          title = v; break;
+        }
+      }
+    }
+    if (title) break;
+  }
+  if (!title) {
+    outer: for (let r = 1; r < headerRow; r++) {
+      const cells = rows[r] || [];
+      for (let c = 1; c < cells.length; c++) {
+        const v = cells[c];
+        if (typeof v === 'string' && v.length > 8 && !/note/i.test(v) && !/^\s*date/i.test(v)) { title = v; break outer; }
+      }
+    }
+  }
+  let capacity = null;
+  if (title) {
+    const m = title.match(/MAX\s*0?(\d+)\s*(PAX|PER|PERSON)/i);
+    if (m) capacity = +m[1];
+  }
+
+  // Date — try direct cell, formula text with /MM/YYYY literal + sheet-name day, or fallback scan
+  let dateISO = null;
+  for (let r = 1; r <= Math.min(rows.length-1, 20); r++) {
+    const cells = rows[r] || [];
+    for (let c = 1; c < cells.length; c++) {
+      const v = cells[c];
+      if (typeof v === 'string' && /^\s*date\s*:?\s*$/i.test(v)) {
+        for (let cc = c + 1; cc < cells.length; cc++) {
+          const adjCell = ws.getRow(r).getCell(cc);
+          const rawVal = adjCell.value;
+          let iso = parseDateValue(cellRaw(adjCell));
+          if (!iso && rawVal && typeof rawVal === 'object' && rawVal.formula) {
+            const m = String(rawVal.formula).match(/"\/(\d{1,2})\/(\d{4})"/);
+            if (m) {
+              const day = parseInt(String(ws.name).replace(/^0/, ''), 10);
+              if (!isNaN(day) && day >= 1 && day <= 31) iso = isoFromParts(+m[2], +m[1], day);
+            }
+          }
+          if (!iso) iso = parseDateValue(cells[cc]);
+          if (iso) { dateISO = iso; break; }
+        }
+      }
+      if (dateISO) break;
+    }
+    if (dateISO) break;
+  }
+  if (!dateISO) {
+    const day = parseInt(String(ws.name).replace(/^0/, ''), 10);
+    if (!isNaN(day) && day >= 1 && day <= 31) {
+      for (let r = 1; r <= Math.min(rows.length-1, 10); r++) {
+        for (let c = 1; c < (rows[r]||[]).length; c++) {
+          const cell = ws.getRow(r).getCell(c);
+          const v = cell.value;
+          if (v && typeof v === 'object' && v.formula) {
+            const m = String(v.formula).match(/"\/(\d{1,2})\/(\d{4})"/);
+            if (m) { dateISO = isoFromParts(+m[2], +m[1], day); break; }
+          }
+        }
+        if (dateISO) break;
+      }
+    }
+  }
+
+  const firstBooking = headerRow + 1;
+  let lastBooking = firstBooking, totalRow = -1;
+  const limit = Math.max(60, ws.actualRowCount || 60);
+  for (let r = firstBooking; r <= limit; r++) {
+    const row = ws.getRow(r);
+    const cells = [];
+    const colCount = Math.max(row.cellCount, 12);
+    for (let c = 1; c <= colCount; c++) cells.push(cellRaw(row.getCell(c)));
+    const hasTotal = cells.some(v => typeof v === 'string' && /^\s*total\s*$/i.test(v));
+    if (hasTotal) { totalRow = r; break; }
+    const policyHit = cells.some(v => typeof v === 'string' && /general\s+policies/i.test(v));
+    if (policyHit) { totalRow = r; break; }
+    lastBooking = r;
+  }
+  if (totalRow > 0) lastBooking = totalRow - 1;
+  if (!capacity) capacity = lastBooking - firstBooking + 1;
+
+  let excursionName = (title || 'Excursion').split(/\(MAX|USD\$|MAX\s*\d/i)[0].trim();
+  excursionName = excursionName.replace(/\s+/g,' ').trim();
+
+  return { headerRow, firstBooking, lastBooking, layout, capacity, dateISO, title, excursionName };
+}
+
+/* ============================================================
+   Booking I/O
+   ============================================================ */
+function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, dateISO, capacity, excursionColor) {
+  const row = ws.getRow(rowIdx);
+  const at = (cIdx) => cIdx == null ? null : row.getCell(cIdx);
+  const slot = cellRaw(row.getCell(1));
+  const room = cellStr(at(layout.layout.room));
+  const guest = cellStr(at(layout.layout.guest));
+  const departureRaw = cellRaw(at(layout.layout.departure));
+  const departure = parseDateValue(departureRaw);
+  const adults = cellNum(at(layout.layout.adults));
+  const child = cellNum(at(layout.layout.child));
+  const liability = cellStr(at(layout.layout.liability));
+  const billNo = cellStr(at(layout.layout.billNo));
+  const remarks = cellStr(at(layout.layout.remarks));
+  const staff = cellStr(at(layout.layout.staff));
+  const isEmpty = !room && !guest && adults == null && child == null
+    && !liability && !billNo && !remarks && !staff && !departureRaw;
+  return {
+    id: `${fileKey}::${sheetName}::${rowIdx}`,
+    fileKey, sheetName, rowIdx,
+    excursionName, excursionColor, capacity, dateISO,
+    slot, room, guest, departure, departureRaw,
+    adults, child, liability, billNo, remarks, staff,
+    isEmpty,
+  };
+}
+function writeBooking(fileEntry, sheetName, rowIdx, fields) {
+  const sheetEntry = fileEntry.sheets.find(s => s.sheetName === sheetName);
+  if (!sheetEntry) return false;
+  const ws = sheetEntry.ws;
+  const layout = sheetEntry.layout.layout;
+  function setCell(c, value) {
+    if (c == null) return;
+    const cell = ws.getRow(rowIdx).getCell(c);
+    cell.value = (value == null || value === '') ? null : value;
+  }
+  setCell(layout.room, fields.room);
+  setCell(layout.guest, fields.guest);
+  setCell(layout.departure, fields.departure ? toDeparture(fields.departure) : null);
+  setCell(layout.adults, fields.adults === '' || fields.adults == null ? null : Number(fields.adults));
+  setCell(layout.child, fields.child === '' || fields.child == null ? null : Number(fields.child));
+  setCell(layout.liability, fields.liability);
+  setCell(layout.billNo, fields.billNo);
+  setCell(layout.remarks, fields.remarks);
+  setCell(layout.staff, fields.staff);
+  fileEntry.dirty = true;
+  rebuildBookings();
+  updateStatus();
+  return true;
+}
+function clearBooking(fileEntry, sheetName, rowIdx) {
+  return writeBooking(fileEntry, sheetName, rowIdx, {
+    room: null, guest: null, departure: null, adults: null, child: null,
+    liability: null, billNo: null, remarks: null, staff: null,
+  });
+}
+function toDeparture(s) {
+  if (!s) return null;
+  const iso = parseDateValue(s);
+  if (iso) {
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  return s;
+}
+
+/* ============================================================
+   File load
+   ============================================================ */
+async function loadFiles(fileSpecs){
+  STATE.files = [];
+  STATE.bookings = [];
+  STATE.excursions = [];
+  for (const spec of fileSpecs) {
+    try {
+      const buf = await spec.getBytes();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf.buffer ? buf.buffer : buf);
+      const sheets = [];
+      wb.eachSheet((ws) => {
+        const lay = detectLayout(ws);
+        if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
+      });
+      STATE.files.push({
+        name: spec.name,
+        fileHandle: spec.fileHandle || null,
+        fileObj: spec.fileObj || null,
+        wb, sheets, dirty: false,
+      });
+    } catch (err) {
+      console.error('load failed', spec.name, err);
+      toast(`Couldn't read ${spec.name}: ${err.message}`, 'error');
+    }
+  }
+  const excSeen = new Map();
+  STATE.files.forEach((f) => {
+    const exName = f.sheets[0]?.layout.excursionName || f.name.replace(/\.xlsx$/i,'');
+    if (!excSeen.has(exName)) excSeen.set(exName, { name: exName, color: colorFor(excSeen.size) });
+    f.excursionName = exName;
+    f.excursionColor = excSeen.get(exName).color;
+  });
+  STATE.excursions = Array.from(excSeen.values());
+  rebuildBookings();
+}
+function rebuildBookings(){
+  const out = [];
+  for (const f of STATE.files) {
+    for (const s of f.sheets) {
+      const lay = s.layout;
+      for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
+        const b = readBooking(s.ws, s.sheetName, f.name, lay, r, f.excursionName, lay.dateISO, lay.capacity, f.excursionColor);
+        if (!b.isEmpty) out.push(b);
+      }
+    }
+  }
+  STATE.bookings = out;
+}
+
+/* ============================================================
+   Save / reload
+   ============================================================ */
+async function saveAll() {
+  const dirtyFiles = STATE.files.filter(f => f.dirty);
+  if (!dirtyFiles.length) { toast('Nothing to save'); return; }
+  let saved = 0;
+  for (const f of dirtyFiles) {
+    try {
+      const buf = await f.wb.xlsx.writeBuffer();
+      if (STATE.mode === 'fs' && f.fileHandle) {
+        const w = await f.fileHandle.createWritable();
+        await w.write(buf);
+        await w.close();
+      } else {
+        const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = f.name; a.click();
+        URL.revokeObjectURL(url);
+      }
+      f.dirty = false;
+      saved++;
+    } catch (err) {
+      console.error(err);
+      toast(`Failed to save ${f.name}: ${err.message}`, 'error');
+    }
+  }
+  if (saved) toast(`Saved ${saved} file${saved>1?'s':''}`, 'success');
+  updateStatus();
+}
+async function reload() {
+  if (STATE.mode === 'fs' && STATE.dirHandle) {
+    if (STATE.files.some(f=>f.dirty)) {
+      if (!confirm('You have unsaved changes. Reload anyway?')) return;
+    }
+    await openDirectory(STATE.dirHandle);
+    toast('Reloaded from disk');
+  } else {
+    toast('Reload only works with shared-folder mode');
+  }
+}
+
+/* ============================================================
+   File source
+   ============================================================ */
+async function openDirectory(handle) {
+  STATE.dirHandle = handle;
+  STATE.mode = 'fs';
+  const specs = [];
+  for await (const [name, h] of handle.entries()) {
+    if (h.kind === 'file' && /\.xlsx$/i.test(name) && !/^~\$/.test(name)) {
+      specs.push({
+        name, fileHandle: h,
+        getBytes: async () => new Uint8Array(await (await h.getFile()).arrayBuffer()),
+      });
+    }
+  }
+  if (!specs.length) { toast('No .xlsx files in that folder', 'error'); return; }
+  toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
+  await loadFiles(specs);
+  showWorkspace();
+}
+async function pickDirectory() {
+  if (!('showDirectoryPicker' in window)) {
+    toast('Your browser doesn\'t support folder access — use "Pick files" instead.', 'error');
+    return;
+  }
+  try {
+    const h = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const perm = await h.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      const req = await h.requestPermission({ mode: 'readwrite' });
+      if (req !== 'granted') { toast('Write permission denied', 'error'); return; }
+    }
+    await openDirectory(h);
+  } catch (e) {
+    if (e.name !== 'AbortError') { console.error(e); toast(e.message, 'error'); }
+  }
+}
+function pickFiles() {
+  const inp = $('#file-input');
+  inp.value = '';
+  inp.onchange = async () => {
+    const files = Array.from(inp.files || []);
+    if (!files.length) return;
+    STATE.mode = 'fp';
+    const specs = files.map(f => ({
+      name: f.name, fileObj: f,
+      getBytes: async () => new Uint8Array(await f.arrayBuffer()),
+    }));
+    toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
+    await loadFiles(specs);
+    showWorkspace();
+  };
+  inp.click();
+}
+
+/* ============================================================
+   View shell
+   ============================================================ */
+function showWorkspace(){
+  $('#welcome').style.display = 'none';
+  $('#workspace').style.display = '';
+  $('#status-area').style.display = 'flex';
+  $('#subhead').style.display = '';
+
+  const sel = $('#filter-excursion');
+  sel.innerHTML = '<option value="">All excursions</option>';
+  STATE.excursions.forEach(e => sel.append(el('option', { value: e.name }, e.name)));
+
+  // Pick selected date: today if present in data, else first data date, else today
+  const allDates = uniqueDates();
+  const t = todayISO();
+  STATE.selectedDate = allDates.includes(t) ? t : (allDates[0] || t);
+
+  updateStatus();
+  renderDateStrip();
+  renderView();
+}
+
+function uniqueDates() {
+  const set = new Set();
+  for (const f of STATE.files) for (const s of f.sheets) {
+    if (s.layout.dateISO) set.add(s.layout.dateISO);
+  }
+  return Array.from(set).sort();
+}
+
+function updateStatus(){
+  const dirty = STATE.files.some(f=>f.dirty);
+  const pill = $('#status-pill'), txt = $('#status-text');
+  pill.classList.toggle('is-dirty', dirty);
+  if (dirty) {
+    const n = STATE.files.filter(f=>f.dirty).length;
+    txt.textContent = `${n} unsaved`;
+  } else {
+    txt.textContent = `${STATE.files.length} file${STATE.files.length>1?'s':''}`;
+  }
+  $('#btn-save').disabled = !dirty;
+}
+
+/* ============================================================
+   Date strip
+   ============================================================ */
+function renderDateStrip() {
+  const strip = $('#date-strip');
+  strip.innerHTML = '';
+  const dates = uniqueDates();
+  if (!dates.length) {
+    strip.append(el('div', {style: {color: 'var(--muted)', fontSize: '13px', padding: '8px'}}, 'No dates in data'));
+    return;
+  }
+  const today = todayISO();
+  let lastMonth = '';
+  dates.forEach(d => {
+    const [y,m] = d.split('-');
+    const monthKey = y+'-'+m;
+    const isMonthStart = monthKey !== lastMonth;
+    lastMonth = monthKey;
+
+    const hasBookings = STATE.bookings.some(b => b.dateISO === d);
+    const isActive = d === STATE.selectedDate;
+    const isToday = d === today;
+
+    const [Y,M,D] = d.split('-').map(Number);
+    const dt = new Date(Y, M-1, D);
+    const dow = dt.toLocaleDateString(undefined, {weekday:'short'}).slice(0,3);
+
+    const pill = el('button', {
+      class: 'date-pill' +
+        (isActive ? ' is-active' : '') +
+        (isToday ? ' is-today' : '') +
+        (isMonthStart ? ' month-divider' : ''),
+      'data-date': d,
+      ...(isMonthStart ? {'data-month': fmtMonth(d)} : {}),
+      onclick: () => { STATE.selectedDate = d; renderDateStrip(); renderView(); }
+    },
+      el('div', {class: 'dow'}, dow),
+      el('div', {class: 'day'}, String(D)),
+      hasBookings ? el('div', {class: 'has-data'}) : null
+    );
+    strip.append(pill);
+  });
+  // scroll selected into view
+  setTimeout(() => {
+    const active = strip.querySelector('.is-active');
+    if (active) active.scrollIntoView({inline: 'center', block: 'nearest'});
+  }, 30);
+}
+
+/* ============================================================
+   Main view dispatch
+   ============================================================ */
+function renderView() {
+  const c = $('#view-container');
+  c.innerHTML = '';
+  // Search overrides everything
+  if (STATE.search.trim()) { c.append(renderSearchResults()); return; }
+  if (STATE.view === 'people') { c.append(renderPeople()); return; }
+  if (STATE.view === 'stats') { c.append(renderStats()); return; }
+  c.append(renderAgenda());
+}
+
+/* ============================================================
+   Agenda view (selected date)
+   ============================================================ */
+function renderAgenda() {
+  const wrap = el('div');
+  const d = STATE.selectedDate;
+  if (!d) {
+    wrap.append(makeEmpty('No date selected', 'Pick a date in the strip above.'));
+    return wrap;
+  }
+
+  // Find sheets for this date, optionally filtered by excursion
+  const sheets = [];
+  for (const f of STATE.files) {
+    for (const s of f.sheets) {
+      if (s.layout.dateISO !== d) continue;
+      if (STATE.excFilter && f.excursionName !== STATE.excFilter) continue;
+      sheets.push({ file: f, sheet: s });
+    }
+  }
+  sheets.sort((a,b)=> a.file.excursionName.localeCompare(b.file.excursionName));
+
+  // Day heading + summary
+  const dayBookings = STATE.bookings.filter(b =>
+    b.dateISO === d && (!STATE.excFilter || b.excursionName === STATE.excFilter));
+  const totalCap = sheets.reduce((s, x) => s + (x.sheet.layout.capacity || 0), 0);
+  const totalPax = dayBookings.reduce((s,b) => s + (b.adults||0) + (b.child||0), 0);
+
+  const heading = el('div', {class:'day-heading'},
+    el('h1', {}, fmtDayOfWeek(d), ', ', el('em', {}, fmtDateLong(d).split(', ').slice(1).join(', ')))
+  );
+  const summary = el('div', {class:'day-summary'});
+  if (sheets.length === 0) {
+    summary.textContent = STATE.excFilter
+      ? `No ${STATE.excFilter} sheet for this date.`
+      : 'No excursions scheduled for this date.';
+  } else {
+    summary.append(
+      el('strong', {}, String(sheets.length)),
+      ` excursion${sheets.length>1?'s':''} · `,
+      el('strong', {}, String(totalPax)),
+      ` of ${totalCap} pax booked`
+    );
+  }
+  heading.append(summary);
+  wrap.append(heading);
+
+  if (!sheets.length) {
+    wrap.append(makeEmpty(
+      'No data for this date',
+      STATE.excFilter
+        ? `Try clearing the excursion filter or picking a different date.`
+        : `Either no excursion sheets exist for ${fmtDateShort(d)}, or this filter excludes them all.`
+    ));
+    return wrap;
+  }
+
+  const agenda = el('div', {class:'agenda'});
+  for (const {file, sheet} of sheets) {
+    agenda.append(renderExcursionCard(file, sheet));
+  }
+  wrap.append(agenda);
+  return wrap;
+}
+
+function renderExcursionCard(file, sheet) {
+  const lay = sheet.layout;
+  const sheetBookings = STATE.bookings
+    .filter(b => b.fileKey === file.name && b.sheetName === sheet.sheetName)
+    .sort((a,b) => (a.slot||0) - (b.slot||0));
+  const filled = sheetBookings.reduce((s,b)=> s + (b.adults||0) + (b.child||0), 0);
+  const cap = lay.capacity || 0;
+  const pct = cap ? Math.min(100, (filled/cap)*100) : 0;
+  const status = filled >= cap ? 'is-full' : (cap && filled >= cap * 0.85) ? 'is-warn' : '';
+
+  const card = el('div', {class: 'exc-card', style: {'--exc-color': file.excursionColor}});
+
+  const head = el('div', {class:'exc-head'},
+    el('div', {class:'exc-name'}, file.excursionName),
+    el('div', {class:'exc-cap'},
+      el('div', {class:'exc-cap-text'}, el('strong', {}, String(filled)), ' / ', String(cap), ' pax'),
+      el('div', {class:'cap-bar'},
+        el('div', {class: 'cap-bar-fill ' + status, style: {width: pct + '%'}})
+      )
+    )
+  );
+  card.append(head);
+
+  if (sheetBookings.length === 0) {
+    card.append(el('div', {class:'empty-card-body'}, 'No bookings yet'));
+  } else {
+    const tbl = el('table', {class:'exc-table'});
+    tbl.append(el('thead', {},
+      el('tr', {},
+        el('th', {class:'col-slot'}, '#'),
+        el('th', {class:'col-room'}, 'Room'),
+        el('th', {}, 'Guest'),
+        el('th', {class:'num-col col-pax'}, 'Pax'),
+        el('th', {class:'col-bill'}, 'Bill'),
+        el('th', {class:'col-remarks'}, 'Remarks'),
+        el('th', {class:'col-staff'}, 'Staff'),
+      )
+    ));
+    const body = el('tbody');
+    for (const b of sheetBookings) {
+      body.append(el('tr', { onclick: () => openEditModal(b) },
+        el('td', {class:'col-slot'}, String(b.slot || '')),
+        el('td', {class:'col-room'}, b.room || ''),
+        el('td', {class:'col-guest'}, b.guest || ''),
+        el('td', {class:'col-pax'}, `${b.adults||0}+${b.child||0}`),
+        el('td', {class:'col-bill'}, b.billNo || ''),
+        el('td', {class:'col-remarks', title: b.remarks || ''}, b.remarks || ''),
+        el('td', {class:'col-staff'}, b.staff || ''),
+      ));
+    }
+    tbl.append(body);
+    card.append(tbl);
+  }
+
+  card.append(el('div', {class:'exc-add-row'},
+    el('button', {
+      class:'btn',
+      onclick: ()=> openAddModal({excursionName: file.excursionName, dateISO: lay.dateISO})
+    },
+      el('svg', {class:'icon', viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2', 'stroke-linecap':'round', 'stroke-linejoin':'round', html:'<path d="M12 5v14M5 12h14"/>'}),
+      'Add booking'
+    )
+  ));
+  return card;
+}
+
+/* ============================================================
+   People (guests) view
+   ============================================================ */
+function renderPeople() {
+  const wrap = el('div');
+  const byGuest = new Map();
+  for (const b of STATE.bookings) {
+    if (STATE.excFilter && b.excursionName !== STATE.excFilter) continue;
+    const k = (b.guest || '').toUpperCase().trim();
+    if (!k) continue;
+    if (!byGuest.has(k)) byGuest.set(k, []);
+    byGuest.get(k).push(b);
+  }
+  const entries = Array.from(byGuest.entries())
+    .sort((a,b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+
+  const heading = el('div', {class:'day-heading'},
+    el('h1', {}, el('em', {}, String(entries.length)), entries.length === 1 ? ' guest' : ' guests')
+  );
+  const summary = el('div', {class:'day-summary'});
+  const totalBookings = entries.reduce((s,[,bs]) => s + bs.length, 0);
+  if (entries.length) {
+    summary.append(
+      el('strong', {}, String(totalBookings)),
+      ` booking${totalBookings>1?'s':''} across `,
+      el('strong', {}, String(STATE.excursions.filter(e => !STATE.excFilter || e.name === STATE.excFilter).length)),
+      ' excursions'
+    );
+  }
+  heading.append(summary);
+  wrap.append(heading);
+
+  if (!entries.length) {
+    wrap.append(makeEmpty('No guests yet', 'When bookings are added, the guest list will appear here.'));
+    return wrap;
+  }
+
+  for (const [name, list] of entries) {
+    list.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||''));
+    const rooms = Array.from(new Set(list.map(b=>b.room).filter(Boolean))).join(' · ');
+    const card = el('div', {class:'guest-card', onclick: ()=> openGuestDetail(name, list)},
+      el('div', {class:'guest-card-head'},
+        el('div', {class:'name'}, name),
+        rooms ? el('div', {class:'rooms'}, rooms) : null,
+        el('div', {class:'count'}, `${list.length} booking${list.length>1?'s':''}`)
+      ),
+      el('div', {class:'meta'},
+        ...list.slice(0, 8).map(b => el('span', {class:'chip'},
+          el('span', {class:'swatch', style:{background: b.excursionColor}}),
+          fmtDateShort(b.dateISO),
+          ' · ',
+          b.excursionName.split(' ').slice(0,3).join(' ')
+        )),
+        list.length > 8 ? el('span', {class:'chip'}, `+${list.length-8} more`) : null
+      )
+    );
+    wrap.append(card);
+  }
+  return wrap;
+}
+
+function openGuestDetail(name, list) {
+  // Show modal listing every booking; click any → opens edit modal
+  const node = el('div', {},
+    el('h2', {}, name),
+    el('div', {class:'sub'}, `${list.length} booking${list.length>1?'s':''}`),
+    el('div', {class:'body', style:{paddingBottom:'12px'}},
+      ...list.map(b => el('div', {
+        class:'result-row',
+        style:{'--exc-color': b.excursionColor, marginBottom:'6px'},
+        onclick: ()=>{ closeModal(); setTimeout(()=>openEditModal(b), 50); }
+      },
+        el('div', {class:'when'},
+          el('strong', {}, fmtDateShort(b.dateISO)),
+          fmtDayOfWeek(b.dateISO)
+        ),
+        el('div', {class:'who'}, b.excursionName),
+        el('div', {class:'what'}, b.remarks || b.staff || ''),
+        el('div', {class:'pax'}, `${b.adults||0}+${b.child||0}`),
+        el('div', {class:'room'}, b.room || ''),
+      ))
+    ),
+    el('div', {class:'foot'},
+      el('button', {class:'btn', onclick: closeModal}, 'Close')
+    )
+  );
+  openModal(node);
+}
+
+/* ============================================================
+   Search results (across all dates / guests)
+   ============================================================ */
+function renderSearchResults() {
+  const wrap = el('div');
+  const q = STATE.search.toLowerCase().trim();
+  let list = STATE.bookings.filter(b => {
+    if (STATE.excFilter && b.excursionName !== STATE.excFilter) return false;
+    const hay = [b.guest, b.room, b.remarks, b.staff, b.billNo, b.liability].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  list.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||'') || a.excursionName.localeCompare(b.excursionName));
+
+  const heading = el('div', {class:'day-heading'},
+    el('h1', {}, el('em', {}, String(list.length)), ' result', list.length === 1 ? '' : 's'),
+    el('div', {class:'day-summary'}, `for "${STATE.search}"`)
+  );
+  wrap.append(heading);
+
+  if (!list.length) {
+    wrap.append(makeEmpty('No matches', 'Try a different name, room number, or bill number.'));
+    return wrap;
+  }
+
+  const results = el('div', {class:'results'});
+  const cap = 80;
+  for (const b of list.slice(0, cap)) {
+    results.append(el('div', {
+      class:'result-row',
+      style: {'--exc-color': b.excursionColor},
+      onclick: ()=> openEditModal(b)
+    },
+      el('div', {class:'when'},
+        el('strong', {}, fmtDateShort(b.dateISO).split(', ')[1] || fmtDateShort(b.dateISO)),
+        fmtDayOfWeek(b.dateISO)
+      ),
+      el('div', {class:'who'}, b.guest || '—'),
+      el('div', {class:'what'}, b.excursionName),
+      el('div', {class:'pax'}, `${b.adults||0}+${b.child||0}`),
+      el('div', {class:'room'}, b.room || ''),
+    ));
+  }
+  if (list.length > cap) {
+    results.append(el('div', {style:{textAlign:'center', color:'var(--muted)', fontSize:'12px', padding:'14px'}},
+      `Showing first ${cap} of ${list.length}. Refine the search to narrow.`));
+  }
+  wrap.append(results);
+  return wrap;
+}
+
+function makeEmpty(title, sub) {
+  return el('div', {class:'empty-state'},
+    el('h3', {}, title),
+    el('p', {}, sub)
+  );
+}
+
+/* ============================================================
+   Modals
+   ============================================================ */
+function openModal(node){
+  const mount = $('#modal-mount');
+  mount.innerHTML = '';
+  const bg = el('div', {class:'modal-bg', onclick: (e)=>{ if (e.target === bg) closeModal(); }},
+    el('div', {class:'modal'}, node)
+  );
+  mount.append(bg);
+  setTimeout(()=>{ const i = bg.querySelector('input,select,textarea'); if (i) i.focus(); }, 30);
+}
+function closeModal(){ $('#modal-mount').innerHTML = ''; }
+
+function openAddModal(prefill = {}) {
+  // Build slots map: { excursionName -> [{date, capacity, filled, ...}] }
+  const slots = [];
+  for (const f of STATE.files) {
+    for (const s of f.sheets) {
+      if (!s.layout.dateISO) continue;
+      const filled = STATE.bookings.filter(b => b.fileKey === f.name && b.sheetName === s.sheetName)
+        .reduce((sm,b)=> sm + (b.adults||0) + (b.child||0), 0);
+      slots.push({
+        fileKey: f.name, sheetName: s.sheetName, color: f.excursionColor,
+        excursionName: f.excursionName, dateISO: s.layout.dateISO,
+        capacity: s.layout.capacity, filled,
+        remaining: s.layout.capacity - filled,
+      });
+    }
+  }
+  slots.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||'') || a.excursionName.localeCompare(b.excursionName));
+
+  let pickedExcursion = prefill.excursionName || '';
+  let pickedDate = prefill.dateISO || (pickedExcursion ? '' : STATE.selectedDate || '');
+
+  const helpEl = el('div', {class:'field-help'});
+  function updateHelp() {
+    const m = slots.find(s => s.excursionName === pickedExcursion && s.dateISO === pickedDate);
+    helpEl.classList.remove('is-good','is-warn');
+    if (!pickedExcursion || !pickedDate) { helpEl.textContent = 'Pick excursion and date to see availability.'; return; }
+    if (!m) { helpEl.textContent = 'No sheet exists for this combination.'; return; }
+    if (m.remaining <= 0) {
+      helpEl.classList.add('is-warn');
+      helpEl.textContent = `⚠ FULL (${m.filled}/${m.capacity}). Adding will overbook.`;
+    } else {
+      helpEl.classList.add('is-good');
+      helpEl.textContent = `${m.remaining} of ${m.capacity} slots free.`;
+    }
+  }
+
+  const exSel = el('select', { onchange: (e)=>{ pickedExcursion = e.target.value; rebuildDateSelect(); updateHelp(); } });
+  exSel.append(el('option', {value:''}, 'Choose excursion…'));
+  for (const e of STATE.excursions) {
+    const opt = el('option', {value: e.name}, e.name);
+    if (e.name === pickedExcursion) opt.selected = true;
+    exSel.append(opt);
+  }
+
+  const dateSel = el('select', { onchange: (e)=>{ pickedDate = e.target.value; updateHelp(); if (typeof tryAutofill === 'function') tryAutofill(); } });
+  function rebuildDateSelect() {
+    dateSel.innerHTML = '';
+    dateSel.append(el('option', {value:''}, 'Choose date…'));
+    const ds = slots.filter(s => !pickedExcursion || s.excursionName === pickedExcursion);
+    const seen = new Set();
+    for (const s of ds) {
+      if (seen.has(s.dateISO)) continue;
+      seen.add(s.dateISO);
+      const opt = el('option', {value: s.dateISO}, `${fmtDateShort(s.dateISO)} — ${s.remaining}/${s.capacity} free`);
+      if (s.dateISO === pickedDate) opt.selected = true;
+      dateSel.append(opt);
+    }
+  }
+  rebuildDateSelect();
+
+  const room = el('input', {type:'text', placeholder:'e.g. 105 or Prebooking'});
+  const guest = el('input', {type:'text', placeholder:'GUEST FULL NAME'});
+  const departure = el('input', {type:'date'});
+  const adults = el('input', {type:'number', min:'0', value:'2'});
+  const child = el('input', {type:'number', min:'0', value:''});
+  const billNo = el('input', {type:'text'});
+  const liability = el('input', {type:'text'});
+  const remarks = el('input', {type:'text'});
+  const staff = el('input', {type:'text'});
+
+  // Autofill from inhouse reports — gracefully no-op if no PDFs loaded or data outdated
+  const inhouseStatus = el('div', {class:'field-help', style:{marginTop:'4px'}});
+  const autofilled = { guest: false, departure: false };
+  // Track manual edits so we never overwrite user input
+  guest.addEventListener('input', () => { autofilled.guest = false; });
+  departure.addEventListener('input', () => { autofilled.departure = false; });
+
+  function tryAutofill() {
+    inhouseStatus.textContent = '';
+    inhouseStatus.classList.remove('is-good', 'is-warn', 'is-info');
+    const r = room.value.trim();
+    if (!r || !pickedDate) return;
+    const result = lookupInhouse(r, pickedDate);
+    if (result.match) {
+      const m = result.match;
+      // Only fill empty fields, or fields we previously autofilled
+      if (m.name && (!guest.value.trim() || autofilled.guest)) {
+        guest.value = m.name; autofilled.guest = true;
+      }
+      if (m.departure && (!departure.value || autofilled.departure)) {
+        departure.value = m.departure; autofilled.departure = true;
+      }
+      inhouseStatus.classList.add('is-info');
+      inhouseStatus.innerHTML = `✓ Auto-filled from ${m.property || 'inhouse'} report (${fmtDateShort(m.businessDate || pickedDate)})`;
+    } else {
+      // Clear fields we previously autofilled
+      if (autofilled.guest) { guest.value = ''; autofilled.guest = false; }
+      if (autofilled.departure) { departure.value = ''; autofilled.departure = false; }
+      // Show contextual reason
+      if (result.reason === 'noreports') {
+        // Silent — show a gentle hint only the first time
+        if (!STATE.inhouseGuests.length) {
+          inhouseStatus.textContent = ''; // truly silent — don't nag
+        }
+      } else if (result.reason === 'outdated') {
+        inhouseStatus.classList.add('is-warn');
+        inhouseStatus.textContent = `⚠ Inhouse data outdated (latest report: ${fmtDateShort(result.latest)}). Fill manually.`;
+      } else if (r) {
+        inhouseStatus.textContent = `No inhouse guest in room ${r} on ${fmtDateShort(pickedDate)}.`;
+      }
+    }
+  }
+  room.addEventListener('input', tryAutofill);
+
+  const submit = ()=>{
+    if (!pickedExcursion || !pickedDate) { toast('Pick excursion and date', 'error'); return; }
+    if (!guest.value.trim()) { toast('Guest name required', 'error'); return; }
+    const slot = slots.find(s => s.excursionName === pickedExcursion && s.dateISO === pickedDate);
+    if (!slot) { toast('No sheet for that date', 'error'); return; }
+    const file = STATE.files.find(f => f.name === slot.fileKey);
+    const sheetEntry = file.sheets.find(s => s.sheetName === slot.sheetName);
+    const lay = sheetEntry.layout;
+    let targetRow = -1;
+    for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
+      const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, file.name, lay, r, file.excursionName, lay.dateISO, lay.capacity, file.excursionColor);
+      if (b.isEmpty) { targetRow = r; break; }
+    }
+    if (targetRow < 0) {
+      if (!confirm('All slots are taken. Overwrite the last slot?')) return;
+      targetRow = lay.lastBooking;
+    }
+    writeBooking(file, sheetEntry.sheetName, targetRow, {
+      room: room.value.trim(), guest: guest.value.trim(),
+      departure: departure.value, adults: adults.value, child: child.value || 0,
+      liability: liability.value.trim(), billNo: billNo.value.trim(),
+      remarks: remarks.value.trim(), staff: staff.value.trim(),
+    });
+    toast('Booking added', 'success');
+    closeModal();
+    renderDateStrip(); renderView();
+  };
+
+  const node = el('div', {},
+    el('h2', {}, 'New ', el('em', {}, 'booking')),
+    el('div', {class:'sub'}, 'Reef Desk writes the booking to the next free slot on the chosen day\'s sheet — original Excel formatting preserved.'),
+    el('div', {class:'body'},
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Excursion'), exSel),
+        el('div', {class:'field'}, el('label', {}, 'Date'), dateSel),
+      ),
+      helpEl,
+      el('div', {class:'field-row', style:{marginTop:'14px'}},
+        el('div', {class:'field'}, el('label', {}, 'Room'), room, inhouseStatus),
+        el('div', {class:'field'}, el('label', {}, 'Guest name'), guest),
+      ),
+      el('div', {class:'field-row-3'},
+        el('div', {class:'field'}, el('label', {}, 'Adults'), adults),
+        el('div', {class:'field'}, el('label', {}, 'Child'), child),
+        el('div', {class:'field'}, el('label', {}, 'Departure'), departure),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Bill no.'), billNo),
+        el('div', {class:'field'}, el('label', {}, 'Liability'), liability),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Staff'), staff),
+        el('div', {class:'field'}, el('label', {}, 'Remarks'), remarks),
+      ),
+    ),
+    el('div', {class:'foot'},
+      el('button', {class:'btn', onclick:closeModal}, 'Cancel'),
+      el('button', {class:'btn btn-primary', onclick:submit}, 'Add booking'),
+    )
+  );
+  openModal(node);
+  updateHelp();
+}
+
+function openEditModal(b) {
+  const file = STATE.files.find(f => f.name === b.fileKey);
+
+  const room = el('input', {type:'text', value: b.room || ''});
+  const guest = el('input', {type:'text', value: b.guest || ''});
+  const departure = el('input', {type:'date', value: b.departure || ''});
+  const adults = el('input', {type:'number', min:'0', value: b.adults ?? ''});
+  const child = el('input', {type:'number', min:'0', value: b.child ?? ''});
+  const billNo = el('input', {type:'text', value: b.billNo || ''});
+  const liability = el('input', {type:'text', value: b.liability || ''});
+  const remarks = el('input', {type:'text', value: b.remarks || ''});
+  const staff = el('input', {type:'text', value: b.staff || ''});
+
+  const save = ()=>{
+    writeBooking(file, b.sheetName, b.rowIdx, {
+      room: room.value.trim(), guest: guest.value.trim(),
+      departure: departure.value, adults: adults.value, child: child.value || 0,
+      liability: liability.value.trim(), billNo: billNo.value.trim(),
+      remarks: remarks.value.trim(), staff: staff.value.trim(),
+    });
+    toast('Booking updated', 'success');
+    closeModal(); renderView();
+  };
+  const cancel = ()=>{
+    if (!confirm(`Cancel ${b.guest || 'this'}'s booking on ${fmtDateShort(b.dateISO)}?`)) return;
+    clearBooking(file, b.sheetName, b.rowIdx);
+    toast('Booking cancelled', 'success');
+    closeModal(); renderView();
+  };
+
+  const node = el('div', {},
+    el('h2', {}, 'Edit ', el('em', {}, 'booking')),
+    el('div', {class:'modal-context-banner', style:{'--exc-color': b.excursionColor}},
+      el('span', {class:'swatch'}),
+      el('span', {}, b.excursionName, ' · ', fmtDateLong(b.dateISO), ' · slot ', String(b.slot ?? '?'))
+    ),
+    el('div', {class:'body'},
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Room'), room),
+        el('div', {class:'field'}, el('label', {}, 'Guest name'), guest),
+      ),
+      el('div', {class:'field-row-3'},
+        el('div', {class:'field'}, el('label', {}, 'Adults'), adults),
+        el('div', {class:'field'}, el('label', {}, 'Child'), child),
+        el('div', {class:'field'}, el('label', {}, 'Departure'), departure),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Bill no.'), billNo),
+        el('div', {class:'field'}, el('label', {}, 'Liability'), liability),
+      ),
+      el('div', {class:'field-row'},
+        el('div', {class:'field'}, el('label', {}, 'Staff'), staff),
+        el('div', {class:'field'}, el('label', {}, 'Remarks'), remarks),
+      ),
+    ),
+    el('div', {class:'foot'},
+      el('button', {class:'btn btn-danger', onclick:cancel}, 'Cancel booking'),
+      el('div', {style:{flex:1}}),
+      el('button', {class:'btn', onclick:closeModal}, 'Close'),
+      el('button', {class:'btn btn-primary', onclick:save}, 'Save'),
+    )
+  );
+  openModal(node);
+}
+
+
+/* ============================================================
+   Inhouse PDF parsing
+   - Position-based extraction using pdf.js text items with x/y
+   - Filename-date fallback (TRML/TRMD reports often encode the date in the name)
+   - Header-based extraction first; shape-based fallback when header isn't found
+   - Tolerates fragmented text, multi-line headers, and varied keyword vocab
+   ============================================================ */
+
+function classifyInhouseHeader(text) {
+  if (!text) return null;
+  const t = String(text).trim();
+  if (/^room\b/i.test(t) || /^cabin\b/i.test(t) || /^rm\b/i.test(t) || /^r\.?no/i.test(t) || /^suite\b/i.test(t) || /room\s*(no|#|num)/i.test(t)) return 'room';
+  if (/^name\b/i.test(t) || /guest\s*name/i.test(t) || /name\s*of\s*guest/i.test(t) || /^pax\s*name/i.test(t) || /^booker/i.test(t) || /^guest$/i.test(t) || /surname/i.test(t)) return 'name';
+  if (/^arr(\.|ival)?\b/i.test(t) || /check.?in/i.test(t) || /arr(\.|ival)?\s*(date|dt)/i.test(t)) return 'arrival';
+  if (/^dep(\.|arture)?\b/i.test(t) || /check.?out/i.test(t) || /dep(\.|arture)?\s*(date|dt)/i.test(t)) return 'departure';
+  return null;
+}
+
+const MONTH_NAMES = {jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12};
+function parseFlexDate(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  const iso = parseDateValue(s);
+  if (iso) return iso;
+  let m = s.match(/^(\d{1,2})[\/\-\s\.]+([A-Za-z]{3,9})[\/\-\s\.,]+(\d{2,4})$/);
+  if (m) {
+    const mo = MONTH_NAMES[m[2].toLowerCase().slice(0,3)];
+    if (mo) {
+      let y = +m[3]; if (y < 100) y += 2000;
+      return isoFromParts(y, mo, +m[1]);
+    }
+  }
+  m = s.match(/^([A-Za-z]{3,9})[\/\-\s\.]+(\d{1,2})[\/\-\s\.,]+(\d{2,4})$/);
+  if (m) {
+    const mo = MONTH_NAMES[m[1].toLowerCase().slice(0,3)];
+    if (mo) {
+      let y = +m[3]; if (y < 100) y += 2000;
+      return isoFromParts(y, mo, +m[2]);
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract a business date from a filename. Tries multiple common patterns.
+ * For ambiguous "DDMM"/"MMDD" 4-digit blocks (e.g. "0305"), prefers whichever
+ * date is closer to today.
+ */
+function parseFilenameDate(filename) {
+  const name = String(filename || '').replace(/\.pdf$/i, '');
+  const today = todayISO();
+  const distToToday = (iso) => {
+    if (!iso) return Infinity;
+    const [y1,m1,d1] = today.split('-').map(Number);
+    const [y2,m2,d2] = iso.split('-').map(Number);
+    return Math.abs(new Date(y1,m1-1,d1) - new Date(y2,m2-1,d2));
+  };
+
+  // YYYYMMDD (8 consecutive digits)
+  let m = name.match(/(?:^|[^\d])(\d{8})(?=$|[^\d])/);
+  if (m) {
+    const y = +m[1].slice(0,4), mo = +m[1].slice(4,6), d = +m[1].slice(6,8);
+    if (y >= 2000 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return isoFromParts(y, mo, d);
+  }
+  // YYYY-MM-DD with - _ / . as separators
+  m = name.match(/(\d{4})[-_\/\.](\d{1,2})[-_\/\.](\d{1,2})/);
+  if (m) {
+    const y = +m[1], mo = +m[2], d = +m[3];
+    if (y >= 2000 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return isoFromParts(y, mo, d);
+  }
+  // DD-MM-YYYY
+  m = name.match(/(\d{1,2})[-_\/\.](\d{1,2})[-_\/\.](\d{4})/);
+  if (m) {
+    const d = +m[1], mo = +m[2], y = +m[3];
+    if (y >= 2000 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return isoFromParts(y, mo, d);
+  }
+  // DD-MMM-YYYY (separators optional, supports 05Jun2026 / 05-Jun-2026 / 05_Jun_2026)
+  m = name.match(/(\d{1,2})[-_\s]*([A-Za-z]{3,9})[-_\s]*(\d{2,4})/);
+  if (m) {
+    const mo = MONTH_NAMES[m[2].toLowerCase().slice(0,3)];
+    if (mo) {
+      const d = +m[1];
+      let y = +m[3]; if (y < 100) y += 2000;
+      if (d >= 1 && d <= 31 && y >= 2000) return isoFromParts(y, mo, d);
+    }
+  }
+  // 4-digit DDMM/MMDD block — ambiguous; pick whichever is closer to today
+  const blocks = [...name.matchAll(/(?:^|[^\d])(\d{4})(?=$|[^\d])/g)].map(x => x[1]).filter(b => !/^(19|20)\d{2}$/.test(b));
+  for (const b of blocks) {
+    const dd = +b.slice(0, 2), mm = +b.slice(2, 4);
+    const mm2 = +b.slice(0, 2), dd2 = +b.slice(2, 4);
+    const year = +today.slice(0, 4);
+    const cand = [];
+    if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) cand.push(isoFromParts(year, mm, dd));
+    if (mm2 >= 1 && mm2 <= 12 && dd2 >= 1 && dd2 <= 31 && (mm2 !== mm || dd2 !== dd)) cand.push(isoFromParts(year, mm2, dd2));
+    cand.sort((a, b) => distToToday(a) - distToToday(b));
+    if (cand.length) return cand[0];
+  }
+  return null;
+}
+
+function looksLikeRoom(s) {
+  if (!s) return false;
+  const t = String(s).trim();
+  if (!t) return false;
+  if (t.length < 1 || t.length > 8) return false;
+  if (!/\d/.test(t)) return false;
+  return /^[A-Za-z]?\d{1,4}[A-Za-z]?$/.test(t);
+}
+
+/** Merge tokens that are very close on the x axis (fragmented text from pdf.js). */
+function mergeAdjacentTokens(line) {
+  if (!line || line.length < 2) return line;
+  const sorted = [...line].sort((a, b) => a.x - b.x);
+  const merged = [{...sorted[0]}];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = merged[merged.length - 1];
+    const curr = sorted[i];
+    const prevRight = prev.x + (prev.width || prev.text.length * 5);
+    const gap = curr.x - prevRight;
+    if (gap <= 3) {
+      prev.text = prev.text + (gap > 1 ? ' ' : '') + curr.text;
+      prev.width = (curr.x + (curr.width || 0)) - prev.x;
+    } else {
+      merged.push({...curr});
+    }
+  }
+  return merged;
+}
+
+async function parseInhousePDF(file) {
+  if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf, disableWorker: false}).promise;
+
+  let property = null;
+  if (/\bTRML\b/i.test(file.name)) property = 'TRML';
+  else if (/\bTRMD\b/i.test(file.name)) property = 'TRMD';
+
+  // Filename date is reliable: many resort exports name files like "TRMD 0305.pdf"
+  let businessDate = parseFilenameDate(file.name);
+
+  const guests = [];
+  const debugInfo = { filename: file.name, pages: pdf.numPages, headerFound: false, rowsFromHeader: 0, rowsFromShape: 0, rawLines: 0 };
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const items = tc.items.map(it => ({
+      text: String(it.str || '').trim(),
+      x: it.transform[4],
+      y: it.transform[5],
+      width: it.width || 0,
+    })).filter(it => it.text);
+    if (!items.length) continue;
+
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const rawLines = [];
+    let cur = [], curY = null;
+    for (const it of items) {
+      if (curY == null || Math.abs(it.y - curY) <= 3) { cur.push(it); curY = curY == null ? it.y : (curY + it.y) / 2; }
+      else { if (cur.length) rawLines.push(cur); cur = [it]; curY = it.y; }
+    }
+    if (cur.length) rawLines.push(cur);
+
+    const lines = rawLines.map(mergeAdjacentTokens);
+    debugInfo.rawLines += lines.length;
+
+    if (p === 1) {
+      for (const line of lines.slice(0, 14)) {
+        const text = line.map(t => t.text).join(' ');
+        if (!property) {
+          if (/\bTRML\b/i.test(text)) property = 'TRML';
+          else if (/\bTRMD\b/i.test(text)) property = 'TRMD';
+        }
+        if (!businessDate) {
+          const labelled = text.match(/(?:business\s*date|report\s*date|date|as\s*of|for\s+the\s+date|for|on)\s*[:.\-]?\s*(\d{1,2}[\/\-\s\.][A-Za-z\d]{2,9}[\/\-\s\.,]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i);
+          if (labelled) {
+            const iso = parseFlexDate(labelled[1]);
+            if (iso) businessDate = iso;
+          }
+          if (!businessDate) {
+            const dm = text.match(/(\d{1,2}[\/\-\s\.][A-Za-z]{3,9}[\/\-\s\.,]\d{2,4})|(\d{1,2}\/\d{1,2}\/\d{4})|(\d{1,2}-\d{1,2}-\d{4})|(\d{4}-\d{2}-\d{2})/);
+            if (dm) {
+              const iso = parseFlexDate(dm[0]);
+              if (iso) businessDate = iso;
+            }
+          }
+        }
+      }
+    }
+
+    // STRATEGY 1: header-based extraction
+    let headerIdx = -1;
+    const colHeaders = {};
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let hasRoom = false, hasName = false;
+      const found = {};
+      for (const tok of line) {
+        const k = classifyInhouseHeader(tok.text);
+        if (k && !found[k]) { found[k] = {x: tok.x, label: tok.text}; }
+        if (k === 'room') hasRoom = true;
+        if (k === 'name') hasName = true;
+      }
+      if (!hasRoom || !hasName) {
+        for (let j = 0; j < line.length; j++) {
+          const joined2 = line.slice(j, j+2).map(x=>x.text).join(' ');
+          const joined3 = line.slice(j, j+3).map(x=>x.text).join(' ');
+          for (const candidate of [joined2, joined3]) {
+            const k = classifyInhouseHeader(candidate);
+            if (k && !found[k]) {
+              found[k] = {x: line[j].x, label: candidate};
+              if (k === 'room') hasRoom = true;
+              if (k === 'name') hasName = true;
+            }
+          }
+        }
+      }
+      if (hasRoom && hasName) {
+        headerIdx = i;
+        Object.assign(colHeaders, found);
+        debugInfo.headerFound = true;
+        break;
+      }
+    }
+
+    if (headerIdx >= 0) {
+      const colSorted = Object.entries(colHeaders)
+        .map(([k, v]) => ({key: k, x: v.x}))
+        .sort((a, b) => a.x - b.x);
+      const colRanges = colSorted.map((c, i) => ({
+        key: c.key,
+        minX: i === 0 ? -Infinity : (colSorted[i-1].x + colSorted[i].x) / 2,
+        maxX: i === colSorted.length - 1 ? Infinity : (colSorted[i].x + colSorted[i+1].x) / 2,
+      }));
+
+      for (let i = headerIdx + 1; i < lines.length; i++) {
+        const line = lines[i];
+        const lineText = line.map(t => t.text).join(' ');
+        if (!lineText.trim()) continue;
+        if (/^\s*page\s+\d+/i.test(lineText)) continue;
+        if (/^\s*(grand\s+)?total\b/i.test(lineText)) continue;
+        if (/^\s*report\s+generated/i.test(lineText)) continue;
+        if (/^\s*(printed|generated)\s+(on|by)/i.test(lineText)) continue;
+        if (line.length < 2) continue;
+
+        const rec = {};
+        for (const tok of line) {
+          const col = colRanges.find(c => tok.x >= c.minX && tok.x < c.maxX);
+          if (!col) continue;
+          rec[col.key] = ((rec[col.key] || '') + ' ' + tok.text).trim().replace(/\s+/g, ' ');
+        }
+
+        let room = (rec.room || '').replace(/[^\w\-]/g, '').trim();
+        if (!room || !looksLikeRoom(room)) continue;
+
+        let arrival = parseFlexDate(rec.arrival);
+        let departure = parseFlexDate(rec.departure);
+        if (!arrival || !departure) {
+          const dates = [];
+          for (const tok of line) {
+            const iso = parseFlexDate(tok.text);
+            if (iso) dates.push(iso);
+          }
+          if (dates.length >= 2) {
+            dates.sort();
+            if (!arrival) arrival = dates[0];
+            if (!departure) departure = dates[dates.length - 1];
+          } else if (dates.length === 1) {
+            if (!arrival && !departure) arrival = dates[0];
+            else if (!arrival) arrival = dates[0];
+            else if (!departure) departure = dates[0];
+          }
+        }
+
+        let name = (rec.name || '').trim().replace(/\s+/g, ' ').toUpperCase();
+        if (!name && !arrival && !departure) continue;
+
+        guests.push({
+          room: room.toLowerCase(),
+          name,
+          arrival, departure,
+          property: property || null,
+          businessDate: businessDate || null,
+          sourceFile: file.name,
+        });
+        debugInfo.rowsFromHeader++;
+      }
+    }
+
+    // STRATEGY 2: shape-based fallback (no header found, or header found 0 rows)
+    if (debugInfo.rowsFromHeader === 0) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const lineText = line.map(t => t.text).join(' ');
+        if (/total|page\s+\d|generated|printed|inhouse|meal\s*plan|business\s*date/i.test(lineText)) continue;
+
+        const roomTok = line.find(t => looksLikeRoom(t.text));
+        if (!roomTok) continue;
+
+        const dateToks = [];
+        for (const tok of line) {
+          const iso = parseFlexDate(tok.text);
+          if (iso) dateToks.push({iso, x: tok.x});
+        }
+        if (dateToks.length === 0) continue;
+
+        const dateXs = new Set(dateToks.map(d => d.x));
+        const nameToks = line
+          .filter(t => t !== roomTok && !dateXs.has(t.x))
+          .filter(t => /[A-Za-z]/.test(t.text))
+          .filter(t => !/^(adult|child|kid|pax|nat|country|note|comment|meal|plan|bb|hb|fb|rate|usd|amt|amount)$/i.test(t.text))
+          .filter(t => !/^\d+$/.test(t.text))
+          .map(t => t.text);
+        const name = nameToks.join(' ').trim().replace(/\s+/g, ' ').toUpperCase();
+        if (!name || name.length < 2) continue;
+
+        dateToks.sort((a,b) => a.x - b.x);
+        const arrival = dateToks[0].iso;
+        const departure = dateToks.length > 1 ? dateToks[dateToks.length - 1].iso : null;
+
+        const room = roomTok.text.replace(/[^\w\-]/g, '').toLowerCase();
+        guests.push({
+          room, name, arrival, departure,
+          property: property || null,
+          businessDate: businessDate || null,
+          sourceFile: file.name,
+        });
+        debugInfo.rowsFromShape++;
+      }
+    }
+  }
+
+  console.log('[inhouse PDF parse]', debugInfo, '→ property:', property, 'businessDate:', businessDate, 'guests:', guests.length);
+
+  return { property, businessDate, guests, debug: debugInfo };
+}
+
+
+function dedupeInhouseGuests(list) {
+  const map = new Map();
+  for (const g of list) {
+    const key = `${g.property || '?'}|${g.room}|${g.name || ''}|${g.arrival || ''}`;
+    const existing = map.get(key);
+    if (!existing) { map.set(key, g); continue; }
+    // Prefer record with most recent businessDate, then with most fields filled
+    const better = (a, b) => {
+      const aBD = a.businessDate || '', bBD = b.businessDate || '';
+      if (aBD !== bBD) return aBD > bBD ? a : b;
+      const aFill = (a.name?1:0) + (a.arrival?1:0) + (a.departure?1:0);
+      const bFill = (b.name?1:0) + (b.arrival?1:0) + (b.departure?1:0);
+      return aFill >= bFill ? a : b;
+    };
+    map.set(key, better(g, existing));
+  }
+  return Array.from(map.values());
+}
+
+function inhouseLatestBusinessDate() {
+  return STATE.inhouseGuests.reduce((max, g) =>
+    (g.businessDate && g.businessDate > max) ? g.businessDate : max, '');
+}
+function isInhouseDataCurrent(bookingDate) {
+  if (!bookingDate) return false;
+  const latest = inhouseLatestBusinessDate();
+  if (!latest) return false;
+  return latest >= bookingDate;
+}
+/**
+ * Lookup guest by room + booking date.
+ * Returns:
+ *   {match: record} when a current, valid match is found
+ *   {match: null, reason: 'none' | 'outdated' | 'noreports' | 'norange'}
+ */
+function lookupInhouse(room, dateISO) {
+  if (!STATE.inhouseGuests.length) return {match: null, reason: 'noreports'};
+  if (!room || !dateISO) return {match: null, reason: 'none'};
+  if (!isInhouseDataCurrent(dateISO)) return {match: null, reason: 'outdated', latest: inhouseLatestBusinessDate()};
+  const r = String(room).replace(/[^\w]/g, '').trim().toLowerCase();
+  if (!r) return {match: null, reason: 'none'};
+  const matches = STATE.inhouseGuests.filter(g => {
+    if (String(g.room).toLowerCase() !== r) return false;
+    if (g.arrival && dateISO < g.arrival) return false;
+    if (g.departure && dateISO > g.departure) return false;
+    return true;
+  });
+  if (!matches.length) return {match: null, reason: 'none'};
+  matches.sort((a, b) => (b.businessDate || '').localeCompare(a.businessDate || ''));
+  return {match: matches[0]};
+}
+
+async function ingestInhousePDFs(fileList) {
+  if (!window.pdfjsLib) { toast('PDF reader not loaded — please refresh', 'error'); return; }
+  const files = Array.from(fileList || []).filter(f => /\.pdf$/i.test(f.name));
+  if (!files.length) { toast('No PDF files selected', 'error'); return; }
+  const newReports = [];
+  for (const file of files) {
+    try {
+      const result = await parseInhousePDF(file);
+      newReports.push({
+        filename: file.name,
+        property: result.property,
+        businessDate: result.businessDate,
+        guestCount: result.guests.length,
+        guests: result.guests,
+        debug: result.debug,
+      });
+    } catch (err) {
+      console.error('PDF parse failed:', file.name, err);
+      newReports.push({
+        filename: file.name, property: null, businessDate: null,
+        guestCount: 0, guests: [], error: err.message || 'parse failed',
+      });
+    }
+  }
+  for (const r of newReports) {
+    if (!r.error) {
+      STATE.inhouseReports.push({
+        filename: r.filename, property: r.property, businessDate: r.businessDate,
+        guestCount: r.guestCount,
+        warning: r.guestCount === 0 ? 'no guest rows detected — check PDF format (see browser console)' : null,
+      });
+      STATE.inhouseGuests.push(...r.guests);
+    } else {
+      STATE.inhouseReports.push({filename: r.filename, property: null, businessDate: null, guestCount: 0, error: r.error});
+    }
+  }
+  STATE.inhouseGuests = dedupeInhouseGuests(STATE.inhouseGuests);
+  updateInhouseBadge();
+
+  const ok = newReports.filter(r => !r.error && r.guestCount > 0).length;
+  const empty = newReports.filter(r => !r.error && r.guestCount === 0).length;
+  const failed = newReports.filter(r => r.error).length;
+  if (ok && !empty && !failed) toast(`Loaded ${ok} report${ok>1?'s':''} · ${STATE.inhouseGuests.length} guests`, 'success');
+  else if (ok) toast(`Loaded ${ok} of ${newReports.length} reports — ${empty + failed} had issues`, 'error');
+  else if (empty) toast(`PDFs read but no guest rows detected — see report list for details`, 'error');
+  else toast(`Could not parse ${failed} report${failed>1?'s':''}`, 'error');
+}
+
+function removeInhouseReport(filename) {
+  STATE.inhouseReports = STATE.inhouseReports.filter(r => r.filename !== filename);
+  STATE.inhouseGuests = STATE.inhouseGuests.filter(g => g.sourceFile !== filename);
+  STATE.inhouseGuests = dedupeInhouseGuests(STATE.inhouseGuests);
+  updateInhouseBadge();
+}
+
+function updateInhouseBadge() {
+  const badge = $('#inhouse-badge');
+  const valid = STATE.inhouseReports.filter(r => !r.error).length;
+  if (!valid) { badge.style.display = 'none'; return; }
+  badge.style.display = 'inline-flex';
+  badge.textContent = String(valid);
+  // Mark stale if latest businessDate is before today
+  const latest = inhouseLatestBusinessDate();
+  badge.classList.toggle('is-stale', !!(latest && latest < todayISO()));
+}
+
+/* ============================================================
+   Inhouse reports modal
+   ============================================================ */
+function openInhouseModal() {
+  const dropZone = el('div', {class: 'upload-zone', id: 'inhouse-drop'},
+    el('svg', {class: 'icon-large', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      html: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'}),
+    el('strong', {}, 'Drop inhouse PDFs here, or click to pick'),
+    el('small', {}, 'Daily TRML / TRMD inhouse reports — guest data is extracted in your browser, never uploaded.')
+  );
+
+  const list = el('div', {class: 'report-list', id: 'inhouse-list'});
+
+  function renderList() {
+    list.innerHTML = '';
+    if (!STATE.inhouseReports.length) {
+      list.append(el('div', {class: 'dash-empty'}, 'No reports loaded yet.'));
+      return;
+    }
+    const sorted = [...STATE.inhouseReports].sort((a,b) => (b.businessDate||'').localeCompare(a.businessDate||''));
+    const todayStr = todayISO();
+    for (const r of sorted) {
+      const prop = r.property || (r.error ? 'ERR' : '?');
+      let meta;
+      let rowClass = 'report-row';
+      if (r.error) {
+        meta = r.error;
+        rowClass += ' is-failed';
+      } else if (r.warning) {
+        meta = r.warning;
+        rowClass += ' is-warned';
+      } else {
+        const dateBit = r.businessDate ? fmtDateShort(r.businessDate) : 'no date';
+        const guestBit = `${r.guestCount} guest${r.guestCount === 1 ? '' : 's'}`;
+        const stale = r.businessDate && r.businessDate < todayStr ? ' · stale' : '';
+        meta = `${dateBit} · ${guestBit}${stale}`;
+      }
+      const row = el('div', {class: rowClass},
+        el('div', {class: 'property'}, prop),
+        el('div', {class: 'name', title: r.filename}, r.filename),
+        el('div', {class: 'meta'}, meta),
+        el('button', {class: 'remove', title: 'Remove', onclick: ()=>{ removeInhouseReport(r.filename); renderList(); }},
+          el('svg', {class:'icon', viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', 'stroke-width':'2', 'stroke-linecap':'round', 'stroke-linejoin':'round', html:'<path d="M18 6 6 18M6 6l12 12"/>'})
+        )
+      );
+      list.append(row);
+    }
+  }
+  renderList();
+
+  const progress = el('div', {class: 'parse-progress', style: {display: 'none'}});
+  async function handleFiles(files) {
+    if (!files || !files.length) return;
+    progress.style.display = 'flex';
+    progress.innerHTML = '';
+    progress.append(el('div', {class: 'spinner'}), `Parsing ${files.length} PDF${files.length>1?'s':''}…`);
+    await ingestInhousePDFs(files);
+    progress.style.display = 'none';
+    renderList();
+  }
+  dropZone.addEventListener('click', () => {
+    const inp = $('#pdf-input');
+    inp.value = '';
+    inp.onchange = () => handleFiles(inp.files);
+    inp.click();
+  });
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('is-drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('is-drag'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('is-drag');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  const node = el('div', {},
+    el('h2', {}, 'Inhouse ', el('em', {}, 'reports')),
+    el('div', {class: 'sub'}, 'Upload daily TRML or TRMD inhouse meal-plan PDFs. New bookings will then auto-fill guest name and departure date from the room number — but only when reports are current.'),
+    el('div', {class: 'body'},
+      dropZone,
+      progress,
+      list,
+    ),
+    el('div', {class: 'foot'},
+      el('button', {class: 'btn', onclick: closeModal}, 'Close')
+    )
+  );
+  openModal(node);
+}
+
+/* ============================================================
+   Stats dashboard
+   ============================================================ */
+function renderStats() {
+  const wrap = el('div');
+
+  // Filter pool
+  let bs = STATE.bookings;
+  if (STATE.excFilter) bs = bs.filter(b => b.excursionName === STATE.excFilter);
+
+  // Headline numbers
+  const totalBookings = bs.length;
+  const totalAdults = bs.reduce((s,b)=>s+(b.adults||0),0);
+  const totalChild = bs.reduce((s,b)=>s+(b.child||0),0);
+  const totalPax = totalAdults + totalChild;
+  const guestSet = new Set(bs.map(b => (b.guest||'').toUpperCase().trim()).filter(Boolean));
+
+  // Capacity
+  let totalCap = 0, totalUsed = 0;
+  for (const f of STATE.files) for (const s of f.sheets) {
+    if (STATE.excFilter && f.excursionName !== STATE.excFilter) continue;
+    if (!s.layout.dateISO) continue;
+    totalCap += s.layout.capacity || 0;
+    totalUsed += STATE.bookings
+      .filter(b => b.fileKey === f.name && b.sheetName === s.sheetName)
+      .reduce((sm,b)=>sm+(b.adults||0)+(b.child||0), 0);
+  }
+  const utilPct = totalCap ? Math.round(totalUsed/totalCap*100) : 0;
+
+  // Heading
+  const heading = el('div', {class:'day-heading'},
+    el('h1', {}, 'At a ', el('em', {}, 'glance')),
+    el('div', {class:'day-summary'},
+      STATE.excFilter ? `Filtered: ${STATE.excFilter}` : `Across all ${STATE.excursions.length} excursions`
+    )
+  );
+  wrap.append(heading);
+
+  // Stat cards
+  const stats = el('div', {class:'stats-grid'},
+    statCard('Bookings', totalBookings, `${guestSet.size} unique guests`),
+    statCard('Pax', totalPax, `${totalAdults} adults · ${totalChild} child`),
+    statCard('Capacity used', utilPct + '%', `${totalUsed} of ${totalCap} seats`),
+    statCard('Days scheduled', uniqueScheduledDates().length, `${todayBookings()} booked today`),
+  );
+  wrap.append(stats);
+
+  if (totalBookings === 0) {
+    wrap.append(el('div', {class:'empty-state'},
+      el('h3', {}, 'No bookings yet'),
+      el('p', {}, 'Stats will appear here once bookings are added.')
+    ));
+    return wrap;
+  }
+
+  const grid = el('div', {class: 'dash-grid'});
+
+  // Excursion popularity
+  const byExc = {};
+  for (const b of bs) {
+    if (!byExc[b.excursionName]) byExc[b.excursionName] = {pax: 0, bookings: 0, color: b.excursionColor};
+    byExc[b.excursionName].pax += (b.adults||0) + (b.child||0);
+    byExc[b.excursionName].bookings += 1;
+  }
+  const excEntries = Object.entries(byExc).sort((a,b) => b[1].pax - a[1].pax);
+  const maxPax = excEntries.length ? excEntries[0][1].pax : 1;
+  const excSec = el('div', {class:'dash-section'},
+    el('h3', {}, 'Excursion popularity'),
+    el('div', {class:'bar-chart'},
+      ...excEntries.map(([name, data]) =>
+        barRow(name, data.pax, maxPax, `${data.pax} pax · ${data.bookings} bookings`, data.color)
+      )
+    )
+  );
+  grid.append(excSec);
+
+  // Day-of-week distribution
+  const dowCounts = [0,0,0,0,0,0,0]; // Mon..Sun
+  for (const b of bs) {
+    if (!b.dateISO) continue;
+    const [y,m,d] = b.dateISO.split('-').map(Number);
+    const jsDow = new Date(y, m-1, d).getDay(); // Sun=0..Sat=6
+    const idx = jsDow === 0 ? 6 : jsDow - 1; // shift to Mon=0..Sun=6
+    dowCounts[idx] += (b.adults||0) + (b.child||0);
+  }
+  const dowMax = Math.max(1, ...dowCounts);
+  const dowLbls = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dowSec = el('div', {class:'dash-section'},
+    el('h3', {}, 'Day of week'),
+    el('div', {class:'dow-chart'},
+      ...dowCounts.map((c, i) =>
+        el('div', {class:'dow-bar'},
+          el('div', {class:'dow-num'}, c > 0 ? String(c) : '·'),
+          el('div', {class:'dow-col'},
+            el('div', {class:'dow-col-fill', style: {height: (c/dowMax*100)+'%'}})
+          ),
+          el('div', {class:'dow-lbl'}, dowLbls[i]),
+        )
+      )
+    )
+  );
+  grid.append(dowSec);
+
+  wrap.append(grid);
+
+  // Bookings per day (timeline)
+  const byDate = {};
+  for (const b of bs) {
+    if (!b.dateISO) continue;
+    if (!byDate[b.dateISO]) byDate[b.dateISO] = 0;
+    byDate[b.dateISO] += (b.adults||0) + (b.child||0);
+  }
+  const dateEntries = Object.entries(byDate).sort();
+  const dateMax = dateEntries.length ? Math.max(...dateEntries.map(d=>d[1])) : 1;
+  const timelineSec = el('div', {class:'dash-section full'},
+    el('h3', {}, 'Pax by date'),
+    dateEntries.length === 0 ? el('div', {class:'dash-empty'}, 'No dated bookings yet.') :
+      el('div', {class:'bar-chart'},
+        ...dateEntries.map(([d, count]) =>
+          barRow(fmtDateShort(d), count, dateMax, `${count} pax`, 'var(--primary)')
+        )
+      )
+  );
+  wrap.append(timelineSec);
+
+  // Top guests
+  const guestMap = new Map();
+  for (const b of bs) {
+    const k = (b.guest || '').toUpperCase().trim();
+    if (!k) continue;
+    if (!guestMap.has(k)) guestMap.set(k, []);
+    guestMap.get(k).push(b);
+  }
+  const topGuests = Array.from(guestMap.entries())
+    .sort((a,b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+    .filter(([, bs]) => bs.length >= 1)
+    .slice(0, 12);
+  if (topGuests.length) {
+    const guestSec = el('div', {class:'dash-section full'},
+      el('h3', {}, 'Top guests'),
+      el('div', {class:'guest-rank'},
+        ...topGuests.map(([name, list], i) =>
+          el('div', {class:'guest-rank-row', onclick: () => openGuestDetail(name, list)},
+            el('div', {class:'rank'}, '#' + (i+1)),
+            el('div', {class:'name'}, name),
+            el('div', {class:'count'}, `${list.length} booking${list.length>1?'s':''}`),
+          )
+        )
+      )
+    );
+    wrap.append(guestSec);
+  }
+
+  return wrap;
+}
+
+function statCard(lbl, val, sub) {
+  return el('div', {class:'stat-card'},
+    el('div', {class:'lbl'}, lbl),
+    el('div', {class:'val'}, String(val)),
+    el('div', {class:'sub'}, sub),
+  );
+}
+function barRow(label, value, max, valText, color) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return el('div', {class:'bar-row', style: {'--bar-color': color}},
+    el('div', {class:'bar-label'},
+      color ? el('span', {class:'swatch', style: {background: color}}) : null,
+      label
+    ),
+    el('div', {class:'bar-val'}, valText),
+    el('div', {class:'bar-track'},
+      el('div', {class:'bar-fill', style: {width: pct + '%'}})
+    ),
+  );
+}
+function uniqueScheduledDates() {
+  const set = new Set();
+  for (const f of STATE.files) for (const s of f.sheets) {
+    if (STATE.excFilter && f.excursionName !== STATE.excFilter) continue;
+    if (s.layout.dateISO) set.add(s.layout.dateISO);
+  }
+  return Array.from(set);
+}
+function todayBookings() {
+  const t = todayISO();
+  return STATE.bookings.filter(b => b.dateISO === t && (!STATE.excFilter || b.excursionName === STATE.excFilter)).length;
+}
+
+/* ============================================================
+   Wire-up
+   ============================================================ */
+$('#btn-open-folder').addEventListener('click', pickDirectory);
+$('#btn-open-files').addEventListener('click', pickFiles);
+$('#btn-add').addEventListener('click', () => openAddModal({dateISO: STATE.selectedDate}));
+$('#btn-save').addEventListener('click', saveAll);
+$('#btn-reload').addEventListener('click', reload);
+$('#btn-inhouse').addEventListener('click', openInhouseModal);
+
+$$('.seg-btn').forEach(btn => btn.addEventListener('click', ()=>{
+  $$('.seg-btn').forEach(b=>b.classList.remove('is-active'));
+  btn.classList.add('is-active');
+  STATE.view = btn.dataset.mode;
+  // Date strip is only relevant in agenda mode without an active search
+  $('#subhead').style.display = (STATE.view === 'agenda' && !STATE.search.trim()) ? '' : 'none';
+  renderView();
+}));
+
+$('#filter-excursion').addEventListener('change', e => {
+  STATE.excFilter = e.target.value;
+  renderDateStrip();
+  renderView();
+});
+
+const searchInput = $('#search');
+const searchClear = $('#search-clear');
+searchInput.addEventListener('input', e => {
+  STATE.search = e.target.value;
+  searchClear.classList.toggle('is-visible', !!STATE.search.trim());
+  $('#subhead').style.display = (STATE.view === 'agenda' && !STATE.search.trim()) ? '' : 'none';
+  renderView();
+});
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  STATE.search = '';
+  searchClear.classList.remove('is-visible');
+  $('#subhead').style.display = STATE.view === 'agenda' ? '' : 'none';
+  renderView();
+  searchInput.focus();
+});
+
+$('#btn-strip-prev').addEventListener('click', () => moveSelectedDate(-1));
+$('#btn-strip-next').addEventListener('click', () => moveSelectedDate(1));
+$('#btn-today').addEventListener('click', () => {
+  const t = todayISO();
+  const all = uniqueDates();
+  STATE.selectedDate = all.includes(t) ? t : (all.find(d => d >= t) || all[0]);
+  renderDateStrip(); renderView();
+});
+
+function moveSelectedDate(delta) {
+  const all = uniqueDates();
+  const idx = all.indexOf(STATE.selectedDate);
+  const next = Math.max(0, Math.min(all.length-1, idx + delta));
+  STATE.selectedDate = all[next];
+  renderDateStrip(); renderView();
+}
+
+window.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveAll(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); if (STATE.files.length) openAddModal({dateISO: STATE.selectedDate}); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchInput.focus(); }
+  if (e.key === 'Escape') {
+    if ($('#modal-mount').innerHTML) closeModal();
+    else if (STATE.search) { searchInput.value=''; STATE.search=''; searchClear.classList.remove('is-visible'); renderView(); }
+  }
+  if (!e.metaKey && !e.ctrlKey && !e.altKey && document.activeElement === document.body && STATE.files.length) {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); moveSelectedDate(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveSelectedDate(1); }
+  }
+});
+window.addEventListener('beforeunload', e=>{
+  if (STATE.files.some(f=>f.dirty)) { e.preventDefault(); e.returnValue = ''; }
+});
+
+if (!('showDirectoryPicker' in window)) {
+  $('#btn-open-folder').style.display = 'none';
+}
+</script>
+
+</body>
+</html>
