@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repo is **not** a typical app project — there is no `package.json`, no build system, no test runner, no linter. Each `Booking engine v*.html` is a fully self-contained single-page app (HTML + inlined CSS + inlined JS + inlined `ExcelJS` and `pdfjs-dist` libraries). The "dev loop" is opening the HTML file directly in a Chromium-based browser.
 
-Versions are kept **side-by-side**, not overwritten. `Booking engine v5.html` (~4705 lines, ~2.5 MB) is the current canonical app. Older files (`Booking engine v4.html` ~4221 lines, `v3.2`, `v3.3 (offline)`, `V2`, `v3-bookings`, `Booking sheets unified V1`) are historical and should generally not be edited unless explicitly requested.
+Versions are kept **side-by-side**, not overwritten. `Booking engine v5.html` (~4705 lines, ~2.5 MB) is the current canonical app; `Booking engine v4.html` (~4221 lines) and `Booking engine v3.3 (offline).html` are the build pipeline inputs and stay at the repo root because `make-v4.sh` / `make-v5.sh` reference root-relative paths. Pure-history files (`Booking engine v3.2.html`, `V2 Booking engine.html`, `v3-bookings.html`, `Booking sheets unified V1.html`, plus the `Booking engine v4 copy.html` / `Booking engine v4 - Ops preview.html` scratch files) live under `archive/` and should generally not be edited unless explicitly requested. Sample PDFs for the inhouse-meal-plan parser live in `samples/`.
 
 ## Building v5 from v4 (and v4 from v3.3)
 
