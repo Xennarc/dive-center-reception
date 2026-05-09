@@ -3907,9 +3907,13 @@ async function parseInhousePDF(file) {
         if (k === 'name') hasName = true;
       }
       if (!hasRoom || !hasName) {
-        for (let j = 0; j < line.length; j++) {
-          const joined2 = line.slice(j, j+2).map(x=>x.text).join(' ');
-          const joined3 = line.slice(j, j+3).map(x=>x.text).join(' ');
+        const len = line.length;
+        for (let j = 0; j < len; j++) {
+          let joined2 = line[j].text;
+          if (j + 1 < len) joined2 += ' ' + line[j+1].text;
+          let joined3 = joined2;
+          if (j + 2 < len) joined3 += ' ' + line[j+2].text;
+
           for (const candidate of [joined2, joined3]) {
             const k = classifyInhouseHeader(candidate);
             if (k && !found[k]) {
