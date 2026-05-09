@@ -1017,6 +1017,63 @@ function applyDatePlaceholders(s, ctx) {
     .replace(/<DATE>/gi, ctx.long);
 }
 
+async function setupOutputDirectory(monthLabel) {
+  if (STATE.mode === 'fs' && STATE.dirHandle) {
+    try {
+      const folderName = `Generated_${monthLabel}`;
+      const outDir = await STATE.dirHandle.getDirectoryHandle(folderName, { create: true });
+      STATE.outDirHandle = outDir;
+      return outDir;
+    } catch (e) {
+      toast('Could not create output folder — falling back to downloads', 'err');
+      return null;
+    }
+  }
+  return null;
+}
+
+function generateWorkbookForMaster(m, dates) {
+  const outWb = new ExcelJS.Workbook();
+  outWb.creator = 'Sheet Shaper';
+  outWb.created = new Date();
+
+  for (const dt of dates) {
+    const tabName = formatTabName(dt, STATE.format);
+    const ctx = {
+      long: formatLongDate(dt),
+      short: `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}`,
+      tab: tabName,
+      day: dt.getDate(),
+      monthName: MONTH_LONG[dt.getMonth()],
+      year: dt.getFullYear(),
+      dow: DAY_LONG[dowMon0(dt)],
+    };
+    // Excel sheet names: max 31 chars, no \\ / ? * [ ]
+    let safeName = tabName.replace(/[\\/?*\[\]:]/g, '_').slice(0, 31);
+    const ws = outWb.addWorksheet(safeName);
+    copyTemplateSheet(m.templateSheet, ws, ctx);
+  }
+
+  return outWb;
+}
+
+async function handleDownload(buf, outName, outDir) {
+  if (outDir) {
+    const fileHandle = await outDir.getFileHandle(outName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(buf);
+    await writable.close();
+  } else {
+    // Manual download
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = outName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+}
+
 async function generateAll() {
   const btn = $('#btn-generate');
   btn.disabled = true;
@@ -1026,18 +1083,7 @@ async function generateAll() {
   const [yy, mm] = STATE.targetMonth.split('-').map(Number);
   const monthLabel = `${MONTH_SHORT[mm - 1]}-${yy}`;
 
-  // Resolve output directory (only for fs mode)
-  let outDir = null;
-  if (STATE.mode === 'fs' && STATE.dirHandle) {
-    try {
-      const folderName = `Generated_${monthLabel}`;
-      outDir = await STATE.dirHandle.getDirectoryHandle(folderName, { create: true });
-      STATE.outDirHandle = outDir;
-    } catch (e) {
-      toast('Could not create output folder — falling back to downloads', 'err');
-      outDir = null;
-    }
-  }
+  const outDir = await setupOutputDirectory(monthLabel);
 
   for (const m of STATE.masters) {
     const dates = datesInMonth(STATE.targetMonth, m.days);
@@ -1047,44 +1093,11 @@ async function generateAll() {
     }
 
     try {
-      const outWb = new ExcelJS.Workbook();
-      outWb.creator = 'Sheet Shaper';
-      outWb.created = new Date();
-
-      for (const dt of dates) {
-        const tabName = formatTabName(dt, STATE.format);
-        const ctx = {
-          long: formatLongDate(dt),
-          short: `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}`,
-          tab: tabName,
-          day: dt.getDate(),
-          monthName: MONTH_LONG[dt.getMonth()],
-          year: dt.getFullYear(),
-          dow: DAY_LONG[dowMon0(dt)],
-        };
-        // Excel sheet names: max 31 chars, no \\ / ? * [ ]
-        let safeName = tabName.replace(/[\\/?*\[\]:]/g, '_').slice(0, 31);
-        const ws = outWb.addWorksheet(safeName);
-        copyTemplateSheet(m.templateSheet, ws, ctx);
-      }
-
+      const outWb = generateWorkbookForMaster(m, dates);
       const outName = safeFilename(`${m.excursionName} — ${monthLabel}.xlsx`);
       const buf = await outWb.xlsx.writeBuffer();
 
-      if (outDir) {
-        const fileHandle = await outDir.getFileHandle(outName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(buf);
-        await writable.close();
-      } else {
-        // Manual download
-        const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = outName;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-      }
+      await handleDownload(buf, outName, outDir);
 
       results.push({
         name: m.excursionName,
