@@ -2930,9 +2930,13 @@ function openActivityCancelModal(file, sheet) {
 }
 
 /* Floating popover under the capacity ✎ button to override slot capacity. */
+let _activeCapacityPopover = null;
 function openCapacityPopover(file, sheet, anchorEl) {
   // Close any existing popover
-  document.querySelectorAll('.cap-popover').forEach(p => p.remove());
+  if (_activeCapacityPopover) {
+    _activeCapacityPopover.remove();
+    _activeCapacityPopover = null;
+  }
   const cur = getSheetMeta(file, sheet.sheetName);
   const def = sheet.layout.capacity || 0;
   const inp = el('input', {type:'number', min:'0', value: cur.customCapacity != null ? String(cur.customCapacity) : ''});
@@ -2941,11 +2945,16 @@ function openCapacityPopover(file, sheet, anchorEl) {
     el('div', {class:'cap-pop-help'}, `Default: ${def}. Leave blank to use default.`),
     inp,
     el('div', {class:'cap-pop-actions'},
-      el('button', {class:'btn btn-small', onclick: () => pop.remove()}, 'Cancel'),
+      el('button', {class:'btn btn-small', onclick: () => {
+        pop.remove();
+        if (_activeCapacityPopover === pop) _activeCapacityPopover = null;
+      }}, 'Cancel'),
       el('button', {class:'btn btn-small', onclick: () => {
         setSheetMeta(file, sheet.sheetName, {customCapacity: null});
         rebuildBookings(); updateStatus();
-        pop.remove(); toast('Capacity reset', 'success'); renderView();
+        pop.remove();
+        if (_activeCapacityPopover === pop) _activeCapacityPopover = null;
+        toast('Capacity reset', 'success'); renderView();
       }}, 'Reset'),
       el('button', {class:'btn btn-small btn-primary', onclick: () => {
         const v = inp.value.trim();
@@ -2953,10 +2962,13 @@ function openCapacityPopover(file, sheet, anchorEl) {
         if (v !== '' && (isNaN(n) || n < 0)) { toast('Enter a valid number', 'error'); return; }
         setSheetMeta(file, sheet.sheetName, {customCapacity: n});
         rebuildBookings(); updateStatus();
-        pop.remove(); toast('Capacity updated', 'success'); renderView();
+        pop.remove();
+        if (_activeCapacityPopover === pop) _activeCapacityPopover = null;
+        toast('Capacity updated', 'success'); renderView();
       }}, 'Save'),
     )
   );
+  _activeCapacityPopover = pop;
   // Position relative to anchor
   const r = anchorEl.getBoundingClientRect();
   Object.assign(pop.style, {
