@@ -4487,7 +4487,10 @@ function renderStats() {
   const dowCounts = [0,0,0,0,0,0,0]; // Mon..Sun
   for (const b of bs) {
     if (!b.dateISO) continue;
-    const [y,m,d] = b.dateISO.split('-').map(Number);
+    const str = b.dateISO;
+    const y = +str.substring(0, 4);
+    const m = +str.substring(5, 7);
+    const d = +str.substring(8, 10);
     const jsDow = new Date(y, m-1, d).getDay(); // Sun=0..Sat=6
     const idx = jsDow === 0 ? 6 : jsDow - 1; // shift to Mon=0..Sun=6
     dowCounts[idx] += (b.adults||0) + (b.child||0);
