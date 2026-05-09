@@ -728,6 +728,7 @@ async function pickFolder() {
       await registerMaster(name, file, handle);
     } catch (e) {
       console.error('skip', name, e);
+      toast(`Skipped ${name}: ${e.message}`, 'err');
     }
   }
 
