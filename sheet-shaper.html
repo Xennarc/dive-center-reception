@@ -931,13 +931,7 @@ function updateGenSummary() {
 
 /* ===== Workbook generation ===== */
 
-/**
- * Copy a worksheet's content/formatting into a new worksheet.
- * Preserves cell values, formulas, styles, merges, column widths, row heights.
- * Replaces date placeholders in cell strings.
- */
-function copyTemplateSheet(srcWs, destWs, dateContext) {
-  // Column widths + styles
+function copyColumns(srcWs, destWs) {
   if (srcWs.columns) {
     srcWs.columns.forEach((col, i) => {
       const destCol = destWs.getColumn(i + 1);
@@ -946,8 +940,9 @@ function copyTemplateSheet(srcWs, destWs, dateContext) {
       if (col.style) destCol.style = JSON.parse(JSON.stringify(col.style));
     });
   }
+}
 
-  // Row data + cell styles
+function copyRows(srcWs, destWs, dateContext) {
   srcWs.eachRow({ includeEmpty: true }, (row, rowNum) => {
     const destRow = destWs.getRow(rowNum);
     if (row.height) destRow.height = row.height;
@@ -977,23 +972,35 @@ function copyTemplateSheet(srcWs, destWs, dateContext) {
     });
     destRow.commit();
   });
+}
 
-  // Merged ranges
+function copyMerges(srcWs, destWs) {
   if (srcWs.model && Array.isArray(srcWs.model.merges)) {
     for (const m of srcWs.model.merges) {
       try { destWs.mergeCells(m); } catch (e) { /* ignore overlapping */ }
     }
   }
+}
 
-  // Sheet view (frozen panes etc.)
+function copySheetViewsAndSetup(srcWs, destWs) {
   if (srcWs.views && srcWs.views.length) {
     destWs.views = JSON.parse(JSON.stringify(srcWs.views));
   }
-
-  // Page setup (so prints look the same)
   if (srcWs.pageSetup) {
     destWs.pageSetup = JSON.parse(JSON.stringify(srcWs.pageSetup));
   }
+}
+
+/**
+ * Copy a worksheet's content/formatting into a new worksheet.
+ * Preserves cell values, formulas, styles, merges, column widths, row heights.
+ * Replaces date placeholders in cell strings.
+ */
+function copyTemplateSheet(srcWs, destWs, dateContext) {
+  copyColumns(srcWs, destWs);
+  copyRows(srcWs, destWs, dateContext);
+  copyMerges(srcWs, destWs);
+  copySheetViewsAndSetup(srcWs, destWs);
 }
 
 function applyDatePlaceholders(s, ctx) {
