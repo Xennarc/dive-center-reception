@@ -3018,7 +3018,11 @@ function renderPeople() {
 
   for (const [name, list] of entries) {
     list.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||''));
-    const rooms = Array.from(new Set(list.map(b=>b.room).filter(Boolean))).join(' · ');
+    const uniqueRooms = new Set();
+    for (const b of list) {
+      if (b.room) uniqueRooms.add(b.room);
+    }
+    const rooms = Array.from(uniqueRooms).join(' · ');
     const card = el('div', {class:'guest-card', onclick: ()=> openGuestDetail(name, list)},
       el('div', {class:'guest-card-head'},
         el('div', {class:'name'}, name),
