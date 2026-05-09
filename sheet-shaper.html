@@ -225,17 +225,36 @@ text-transform: uppercase;
 letter-spacing: 0.1em;
 color: var(–ink-3);
 }
-.format-picker select {
-font-family: var(–sans);
+.format-picker input {
+font-family: var(--sans);
 font-size: 14px;
 padding: 8px 12px;
-border: 1px solid var(–border-strong);
+border: 1px solid var(--border-strong);
 border-radius: 8px;
-background: var(–card);
-color: var(–ink);
-cursor: pointer;
+background: var(--card);
+color: var(--ink);
 }
 
+.folder-picker {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+.folder-picker label {
+font-size: 11px;
+text-transform: uppercase;
+letter-spacing: 0.1em;
+color: var(--ink-3);
+}
+.folder-picker input {
+font-family: var(--sans);
+font-size: 14px;
+padding: 8px 12px;
+border: 1px solid var(--border-strong);
+border-radius: 8px;
+background: var(--card);
+color: var(--ink);
+}
 /* ===== Master cards ===== */
 .masters {
 display: grid;
@@ -576,17 +595,21 @@ gap: 14px;
       </div>
       <div class="format-picker">
         <label>Tab name format</label>
-        <select id="format-picker">
-          <option value="DD-MMM">05-May</option>
-          <option value="DD MMM">05 May</option>
-          <option value="DD-MM">05-05</option>
-          <option value="MMM DD">May 05</option>
-          <option value="Day DD">Day 05</option>
-        </select>
+        <input type="text" id="format-picker" list="format-suggestions" value="DD-MMM" />
+        <datalist id="format-suggestions">
+          <option value="DD-MMM"></option>
+          <option value="DD MMM"></option>
+          <option value="DD-MM"></option>
+          <option value="MMM DD"></option>
+          <option value="Day DD"></option>
+        </datalist>
+      </div>
+      <div class="folder-picker">
+        <label>Folder format</label>
+        <input type="text" id="folder-picker" value="Generated_{{monthLabel}}" />
       </div>
     </div>
 
-```
 <div id="masters" class="masters"></div>
 
 <div class="gen-footer">
@@ -596,7 +619,6 @@ gap: 14px;
     Generate workbooks
   </button>
 </div>
-```
 
   </section>
 </main>
@@ -620,6 +642,7 @@ const STATE = {
   outDirHandle: null,  // output subfolder handle
   masters: [],         // [{name, fileHandle?, fileObj, workbook, templateSheet, days:[7]bool}]
   targetMonth: '',     // 'YYYY-MM'
+  folderFormat: 'Generated_{{monthLabel}}', // custom folder name format
   format: 'DD-MMM',
 };
 
@@ -931,6 +954,31 @@ function updateGenSummary() {
 
 /* ===== Workbook generation ===== */
 
+function copyDataValidations(srcWs, destWs) {
+  if (srcWs.dataValidations && srcWs.dataValidations.model) {
+    for (const range in srcWs.dataValidations.model) {
+      destWs.dataValidations.add(range, srcWs.dataValidations.model[range]);
+    }
+  }
+}
+
+function copyImages(srcWb, srcWs, destWb, destWs) {
+  const images = srcWs.getImages();
+  for (const image of images) {
+    const imgData = srcWb.getImage(image.imageId);
+    let addImageParam = { extension: imgData.extension || 'png' };
+    if (imgData.base64) {
+      addImageParam.base64 = imgData.base64;
+    } else if (imgData.buffer) {
+      addImageParam.buffer = imgData.buffer;
+    }
+    if (addImageParam.base64 || addImageParam.buffer) {
+      const newImageId = destWb.addImage(addImageParam);
+      destWs.addImage(newImageId, image.range);
+    }
+  }
+}
+
 function copyColumns(srcWs, destWs) {
   if (srcWs.columns) {
     srcWs.columns.forEach((col, i) => {
@@ -969,6 +1017,8 @@ function copyRows(srcWs, destWs, dateContext) {
         destCell.style = JSON.parse(JSON.stringify(cell.style));
       }
       if (cell.numFmt) destCell.numFmt = cell.numFmt;
+      if (cell.note) destCell.note = cell.note;
+      if (cell.dataValidation) destCell.dataValidation = JSON.parse(JSON.stringify(cell.dataValidation));
     });
     destRow.commit();
   });
@@ -996,11 +1046,13 @@ function copySheetViewsAndSetup(srcWs, destWs) {
  * Preserves cell values, formulas, styles, merges, column widths, row heights.
  * Replaces date placeholders in cell strings.
  */
-function copyTemplateSheet(srcWs, destWs, dateContext) {
+function copyTemplateSheet(srcWb, srcWs, destWb, destWs, dateContext) {
+  copyDataValidations(srcWs, destWs);
   copyColumns(srcWs, destWs);
   copyRows(srcWs, destWs, dateContext);
   copyMerges(srcWs, destWs);
   copySheetViewsAndSetup(srcWs, destWs);
+  copyImages(srcWb, srcWs, destWb, destWs);
 }
 
 function applyDatePlaceholders(s, ctx) {
@@ -1030,7 +1082,7 @@ async function generateAll() {
   let outDir = null;
   if (STATE.mode === 'fs' && STATE.dirHandle) {
     try {
-      const folderName = `Generated_${monthLabel}`;
+      const folderName = STATE.folderFormat.replace(/\{\{monthLabel\}\}/g, monthLabel);
       outDir = await STATE.dirHandle.getDirectoryHandle(folderName, { create: true });
       STATE.outDirHandle = outDir;
     } catch (e) {
@@ -1039,7 +1091,9 @@ async function generateAll() {
     }
   }
 
-  for (const m of STATE.masters) {
+  for (let i = 0; i < STATE.masters.length; i++) {
+    const m = STATE.masters[i];
+    btn.innerHTML = '<span>Generating ' + (i + 1) + ' of ' + STATE.masters.length + '...</span>';
     const dates = datesInMonth(STATE.targetMonth, m.days);
     if (dates.length === 0) {
       results.push({ name: m.excursionName, status: 'skipped', reason: 'no running days' });
@@ -1065,7 +1119,7 @@ async function generateAll() {
         // Excel sheet names: max 31 chars, no \\ / ? * [ ]
         let safeName = tabName.replace(/[\\/?*\[\]:]/g, '_').slice(0, 31);
         const ws = outWb.addWorksheet(safeName);
-        copyTemplateSheet(m.templateSheet, ws, ctx);
+        copyTemplateSheet(m.workbook, m.templateSheet, outWb, ws, ctx);
       }
 
       const outName = safeFilename(`${m.excursionName} — ${monthLabel}.xlsx`);
@@ -1094,6 +1148,7 @@ async function generateAll() {
       });
     } catch (e) {
       console.error(e);
+      toast('Error generating ' + m.excursionName + ': ' + e.message, 'err');
       results.push({ name: m.excursionName, status: 'error', reason: e.message });
     }
   }
@@ -1168,6 +1223,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('#format-picker').addEventListener('change', e => {
     STATE.format = e.target.value;
+  });
+  $('#folder-picker').addEventListener('change', e => {
+    STATE.folderFormat = e.target.value;
   });
 
   // Default month
