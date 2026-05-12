@@ -1173,6 +1173,14 @@ const STATE = {
   saving: new Set(),         // filenames currently mid-save (poller skips these)
 };
 
+// Diagnostic mode — ?diag=1 captures a paste-able diff of every zip part
+// ExcelJS dropped or rewrote on each save, so Excel "We found a problem
+// with some content" recovery dialogs can be reproduced without
+// instrumenting the whole save path.
+const DIAG = (() => {
+  try { return /[?&](diag|debug)=1\b/.test(location.search); } catch (_) { return false; }
+})();
+
 const PALETTE = ['#1B4965','#3D6975','#4A7C59','#856437','#A85A4A','#5E5081','#9C7A2C','#3A7866','#6B5070','#7A4E3A'];
 function colorFor(idx){ return PALETTE[idx % PALETTE.length]; }
 
@@ -1842,6 +1850,9 @@ async function loadFiles(fileSpecs){
         lastSyncedMtime,
         pendingOps: [],
         remoteChanged: false,
+        // Raw bytes-on-disk; consumed by postProcessXlsx to preserve parts
+        // ExcelJS drops or mangles (drawings, comments, externalLinks, …).
+        originalBytes: buf instanceof Uint8Array ? buf : new Uint8Array(buf),
       });
     } catch (err) {
       console.error('load failed', spec.name, err);
@@ -1892,6 +1903,7 @@ async function reloadFile(fileEntry){
   fileEntry.bookingMeta = bookingMeta;
   fileEntry.sheetMeta = sheetMeta;
   fileEntry.lastSyncedMtime = file.lastModified || 0;
+  fileEntry.originalBytes = new Uint8Array(buf);
   rebuildBookings();
 }
 function rebuildBookings(){
@@ -1908,6 +1920,345 @@ function rebuildBookings(){
     }
   }
   STATE.bookings = out;
+}
+
+/* ============================================================
+   Xlsx post-processing
+   - ExcelJS's writeBuffer drops or mangles parts Excel cares about
+     (xl/externalLinks, drawings, comments, conditional formatting,
+     stray <c> cells inside merged ranges), which triggers Excel's
+     "We found a problem with some content" recovery dialog. This
+     module reassembles the output zip from ExcelJS's managed parts +
+     the original input zip's untouched parts, and scrubs merge-orphan
+     cells from each worksheet XML.
+   - Vanilla ZIP reader/writer (no JSZip): xlsx files live well under
+     ZIP64 limits, and modern browsers ship DecompressionStream /
+     CompressionStream with 'deflate-raw' — which Reef Desk already
+     requires alongside the File System Access API.
+   - With ?diag=1, postProcessXlsx also returns a paste-able diff
+     listing every part missing in / differing from the original,
+     surfaced in a modal at the end of saveAll.
+   ============================================================ */
+
+// Parts ExcelJS owns end-to-end. Preservation must NOT overwrite these,
+// or in-app booking edits would be silently rolled back.
+const _MANAGED_PARTS_RE = /^(?:\[Content_Types\]\.xml|_rels\/\.rels|docProps\/(?:core|app|custom)\.xml|xl\/workbook\.xml|xl\/_rels\/workbook\.xml\.rels|xl\/sharedStrings\.xml|xl\/styles\.xml|xl\/theme\/theme1\.xml|xl\/calcChain\.xml|xl\/worksheets\/sheet\d+\.xml)$/;
+const _SHEET_XML_RE = /^xl\/worksheets\/sheet\d+\.xml$/;
+
+const _ZIP_LFH = 0x04034b50;
+const _ZIP_CDH = 0x02014b50;
+const _ZIP_EOCD = 0x06054b50;
+
+function _readU16(u8, o) { return u8[o] | (u8[o+1] << 8); }
+function _readU32(u8, o) { return (u8[o] | (u8[o+1] << 8) | (u8[o+2] << 16) | (u8[o+3] << 24)) >>> 0; }
+
+function _parseZip(buf) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  // EOCD lives in the last 22 bytes + up to 64KB of comment. Scan back.
+  let eocd = -1;
+  const floor = Math.max(0, u8.length - 65557);
+  for (let i = u8.length - 22; i >= floor; i--) {
+    if (_readU32(u8, i) === _ZIP_EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('parseZip: EOCD not found');
+  const total = _readU16(u8, eocd + 10);
+  let p = _readU32(u8, eocd + 16);
+  const entries = new Map();
+  for (let i = 0; i < total; i++) {
+    if (_readU32(u8, p) !== _ZIP_CDH) throw new Error('parseZip: bad CDH @' + p);
+    const versionMadeBy = _readU16(u8, p + 4);
+    const versionNeeded = _readU16(u8, p + 6);
+    const generalFlag = _readU16(u8, p + 8);
+    const method = _readU16(u8, p + 10);
+    const modTime = _readU16(u8, p + 12);
+    const modDate = _readU16(u8, p + 14);
+    const crc32 = _readU32(u8, p + 16);
+    const compSize = _readU32(u8, p + 20);
+    const uncompSize = _readU32(u8, p + 24);
+    const nameLen = _readU16(u8, p + 28);
+    const extraLen = _readU16(u8, p + 30);
+    const commentLen = _readU16(u8, p + 32);
+    const internalAttr = _readU16(u8, p + 36);
+    const externalAttr = _readU32(u8, p + 38);
+    const lfh = _readU32(u8, p + 42);
+    const name = new TextDecoder('utf-8').decode(u8.subarray(p + 46, p + 46 + nameLen));
+    const extraField = u8.slice(p + 46 + nameLen, p + 46 + nameLen + extraLen);
+    if (_readU32(u8, lfh) !== _ZIP_LFH) throw new Error('parseZip: bad LFH @' + lfh);
+    // Local-header extra field can differ from central-dir extra (zip spec
+    // permits it). Recompute the data offset from the LFH so compData is
+    // sliced from the right place.
+    const lfhNameLen = _readU16(u8, lfh + 26);
+    const lfhExtraLen = _readU16(u8, lfh + 28);
+    const dataOffset = lfh + 30 + lfhNameLen + lfhExtraLen;
+    const compData = u8.slice(dataOffset, dataOffset + compSize);
+    entries.set(name, {
+      name, method, crc32, compSize, uncompSize, compData, extraField,
+      versionMadeBy, versionNeeded, generalFlag, modTime, modDate,
+      internalAttr, externalAttr,
+    });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+
+const _CRC32_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+function _crc32(u8) {
+  let c = 0xffffffff;
+  for (let i = 0; i < u8.length; i++) c = (_CRC32_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8)) >>> 0;
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+async function _inflate(u8) {
+  const ds = new DecompressionStream('deflate-raw');
+  const ab = await new Response(new Blob([u8]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(ab);
+}
+async function _deflateRaw(u8) {
+  const cs = new CompressionStream('deflate-raw');
+  const ab = await new Response(new Blob([u8]).stream().pipeThrough(cs)).arrayBuffer();
+  return new Uint8Array(ab);
+}
+
+function _concat(parts) {
+  let total = 0;
+  for (const p of parts) total += p.length;
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) { out.set(p, off); off += p.length; }
+  return out;
+}
+
+function _buildZip(entries) {
+  const parts = [];
+  const cdh = [];
+  let offset = 0;
+  for (const e of entries) {
+    const nameBytes = new TextEncoder().encode(e.name);
+    const extra = e.extraField || new Uint8Array(0);
+    // Always write sizes inline (clear streaming bit 3) so we never need
+    // a data descriptor — keeps the writer trivial.
+    const lfh = new Uint8Array(30);
+    const lv = new DataView(lfh.buffer);
+    lv.setUint32(0, _ZIP_LFH, true);
+    lv.setUint16(4, e.versionNeeded || 20, true);
+    lv.setUint16(6, (e.generalFlag || 0) & ~0x0008, true);
+    lv.setUint16(8, e.method, true);
+    lv.setUint16(10, e.modTime || 0, true);
+    lv.setUint16(12, e.modDate || 0, true);
+    lv.setUint32(14, e.crc32, true);
+    lv.setUint32(18, e.compSize, true);
+    lv.setUint32(22, e.uncompSize, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, extra.length, true);
+    parts.push(lfh, nameBytes, extra, e.compData);
+
+    const c = new Uint8Array(46);
+    const cv = new DataView(c.buffer);
+    cv.setUint32(0, _ZIP_CDH, true);
+    cv.setUint16(4, e.versionMadeBy || 20, true);
+    cv.setUint16(6, e.versionNeeded || 20, true);
+    cv.setUint16(8, (e.generalFlag || 0) & ~0x0008, true);
+    cv.setUint16(10, e.method, true);
+    cv.setUint16(12, e.modTime || 0, true);
+    cv.setUint16(14, e.modDate || 0, true);
+    cv.setUint32(16, e.crc32, true);
+    cv.setUint32(20, e.compSize, true);
+    cv.setUint32(24, e.uncompSize, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, extra.length, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, e.internalAttr || 0, true);
+    cv.setUint32(38, e.externalAttr || 0, true);
+    cv.setUint32(42, offset, true);
+    cdh.push(c, nameBytes, extra);
+
+    offset += 30 + nameBytes.length + extra.length + e.compData.length;
+  }
+  const cdStart = offset;
+  let cdSize = 0;
+  for (const p of cdh) cdSize += p.length;
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, _ZIP_EOCD, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, cdStart, true);
+  ev.setUint16(20, 0, true);
+  return _concat([...parts, ...cdh, eocd]);
+}
+
+function _colNum(s) {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
+  return n;
+}
+
+// Drop <c r="..."> cells inside <mergeCell> ranges that aren't the
+// top-left anchor. ExcelJS sometimes emits styled-but-empty cells inside
+// merges; Excel reports them as "repaired records". String surgery
+// (rather than DOMParser round-trip) keeps the rest of the XML byte-for
+// -byte identical to what ExcelJS wrote.
+function _dropMergeOrphans(xml) {
+  const ranges = [];
+  const mergeRe = /<mergeCell\s+ref="([A-Z]+\d+):([A-Z]+\d+)"\s*\/?>/g;
+  let m;
+  while ((m = mergeRe.exec(xml)) !== null) {
+    const a = /^([A-Z]+)(\d+)$/.exec(m[1]);
+    const b = /^([A-Z]+)(\d+)$/.exec(m[2]);
+    if (!a || !b) continue;
+    ranges.push({ c1: _colNum(a[1]), r1: +a[2], c2: _colNum(b[1]), r2: +b[2], anchor: m[1] });
+  }
+  if (!ranges.length) return { xml, dropped: 0 };
+  let dropped = 0;
+  // Cells don't nest inside other cells, so non-greedy is safe. Match either
+  // self-closing <c .../> or <c ...>…</c>.
+  const cellRe = /<c\s[^>]*\br="([A-Z]+\d+)"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g;
+  const out = xml.replace(cellRe, (full, ref) => {
+    const pm = /^([A-Z]+)(\d+)$/.exec(ref);
+    if (!pm) return full;
+    const col = _colNum(pm[1]), row = +pm[2];
+    for (const r of ranges) {
+      if (col >= r.c1 && col <= r.c2 && row >= r.r1 && row <= r.r2 && ref !== r.anchor) {
+        dropped++;
+        return '';
+      }
+    }
+    return full;
+  });
+  return { xml: out, dropped };
+}
+
+/**
+ * Post-process ExcelJS's writeBuffer output:
+ *   1. Optionally diff input vs raw output zip part lists (DIAG mode).
+ *   2. Copy every non-managed input part verbatim into the output map —
+ *      drawings, comments, externalLinks, pivot tables, etc.
+ *   3. Drop merge-orphan <c> cells from each worksheet XML.
+ * Returns { bytes, diag? }.
+ */
+async function postProcessXlsx(originalBytes, rawOutput) {
+  const outU8 = rawOutput instanceof Uint8Array ? rawOutput : new Uint8Array(rawOutput);
+  let outMap, inMap;
+  try {
+    outMap = _parseZip(outU8);
+    inMap = originalBytes ? _parseZip(originalBytes) : new Map();
+  } catch (e) {
+    // Better to ship the (possibly broken) raw ExcelJS output than to fail
+    // the save outright — restores legacy behaviour on unexpected inputs.
+    console.warn('postProcessXlsx: zip parse failed, using raw ExcelJS output', e);
+    return { bytes: outU8, diag: null };
+  }
+
+  let diag = null;
+  if (DIAG) {
+    diag = { missing: [], differing: [], added: [], orphansDropped: {} };
+    for (const [name, inEntry] of inMap) {
+      const outEntry = outMap.get(name);
+      if (!outEntry) { diag.missing.push(name); continue; }
+      if (inEntry.uncompSize !== outEntry.uncompSize || inEntry.crc32 !== outEntry.crc32) {
+        diag.differing.push(name);
+      }
+    }
+    for (const name of outMap.keys()) {
+      if (!inMap.has(name)) diag.added.push(name);
+    }
+  }
+
+  // Step 2 — preserve unmanaged parts verbatim.
+  for (const [name, inEntry] of inMap) {
+    if (_MANAGED_PARTS_RE.test(name)) continue;
+    outMap.set(name, inEntry);
+  }
+
+  // Step 3 — merge-orphan pass over each sheet XML.
+  const orphans = {};
+  for (const [name, entry] of outMap) {
+    if (!_SHEET_XML_RE.test(name)) continue;
+    let xml;
+    try {
+      const raw = entry.method === 0 ? entry.compData : await _inflate(entry.compData);
+      xml = new TextDecoder('utf-8').decode(raw);
+    } catch (e) {
+      console.warn('inflate failed for', name, e);
+      continue;
+    }
+    const { xml: cleaned, dropped } = _dropMergeOrphans(xml);
+    if (!dropped) continue;
+    orphans[name] = dropped;
+    const newU = new TextEncoder().encode(cleaned);
+    const newC = await _deflateRaw(newU);
+    outMap.set(name, {
+      ...entry,
+      method: 8,
+      crc32: _crc32(newU),
+      uncompSize: newU.length,
+      compSize: newC.length,
+      compData: newC,
+      generalFlag: 0,
+    });
+  }
+  if (diag) diag.orphansDropped = orphans;
+
+  return { bytes: _buildZip(Array.from(outMap.values())), diag };
+}
+
+function _showDiagModal(reports) {
+  const lines = [];
+  for (const r of reports) {
+    lines.push(`=== ${r.name} ===`);
+    if (r.missing.length) {
+      lines.push('Missing in output (preserved from original):');
+      for (const n of r.missing) lines.push('  - ' + n);
+    }
+    if (r.differing.length) {
+      lines.push('Bytes differ (size/crc) — preserved if non-managed:');
+      for (const n of r.differing) lines.push('  ~ ' + n);
+    }
+    if (r.added.length) {
+      lines.push('Added by ExcelJS:');
+      for (const n of r.added) lines.push('  + ' + n);
+    }
+    const orphanKeys = Object.keys(r.orphansDropped || {});
+    if (orphanKeys.length) {
+      lines.push('Merge-orphan <c> cells dropped:');
+      for (const k of orphanKeys) lines.push(`  ${r.orphansDropped[k]} in ${k}`);
+    }
+    if (!r.missing.length && !r.differing.length && !r.added.length && !orphanKeys.length) {
+      lines.push('(no differences)');
+    }
+    lines.push('');
+  }
+  const text = lines.join('\n');
+  const ta = el('textarea', {
+    readonly: '',
+    style: { width: '100%', height: '320px', fontFamily: 'var(--mono, ui-monospace, monospace)', fontSize: '12px' },
+  });
+  ta.value = text;
+  const node = el('div', {},
+    el('h2', {}, 'Save ', el('em', {}, 'diagnostics')),
+    el('div', { class: 'sub' }, 'Zip parts that changed between ExcelJS output and the on-disk original. Copy this report back to the developer.'),
+    el('div', { class: 'body' }, ta),
+    el('div', { class: 'actions' },
+      el('button', { class: 'btn', onclick: async () => {
+        try { await navigator.clipboard.writeText(text); toast('Copied'); }
+        catch (_) { ta.select(); try { document.execCommand('copy'); toast('Copied'); } catch (_) {} }
+      }}, 'Copy'),
+      el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Close'),
+    ),
+  );
+  openModal(node);
 }
 
 /* ============================================================
@@ -1930,6 +2281,7 @@ async function saveAll() {
   }
 
   let saved = 0;
+  const diagReports = [];
   for (const f of dirtyFiles) {
     STATE.saving.add(f.name);
     updateSavingIndicator();
@@ -1970,7 +2322,13 @@ async function saveAll() {
         }
 
         flushMetaSheets(f);
-        const buf = await f.wb.xlsx.writeBuffer();
+        const rawBuf = await f.wb.xlsx.writeBuffer();
+        const post = await postProcessXlsx(f.originalBytes, rawBuf);
+        const buf = post.bytes;
+        if (DIAG && post.diag) diagReports.push({ name: f.name, ...post.diag });
+        // Keep originalBytes in sync with what we just wrote so the next save's
+        // preservation pass works against the on-disk state, not the prior load.
+        f.originalBytes = buf;
         // createWritable can throw if the underlying file was renamed/replaced
         // (NotFoundError) or is held by another process (NotAllowedError).
         // Re-resolve once on NotFoundError and retry; tag lock-style errors so
@@ -2004,7 +2362,11 @@ async function saveAll() {
       } else {
         // 'fp' mode — manual file picker, sync is silently disabled.
         flushMetaSheets(f);
-        const buf = await f.wb.xlsx.writeBuffer();
+        const rawBuf = await f.wb.xlsx.writeBuffer();
+        const post = await postProcessXlsx(f.originalBytes, rawBuf);
+        const buf = post.bytes;
+        if (DIAG && post.diag) diagReports.push({ name: f.name, ...post.diag });
+        f.originalBytes = buf;
         const blob = new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2042,6 +2404,7 @@ async function saveAll() {
   if (saved) toast(`Saved ${saved} file${saved>1?'s':''}`, 'success');
   updateStatus();
   renderView();
+  if (DIAG && diagReports.length) _showDiagModal(diagReports);
 }
 async function reload() {
   if (STATE.mode === 'fs' && STATE.dirHandle) {
