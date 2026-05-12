@@ -5,9 +5,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Reef Desk</title>
-<link rel="preconnect" href="<https://fonts.googleapis.com>">
-<link rel="preconnect" href="<https://fonts.gstatic.com>" crossorigin>
-<link href="<https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap>" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='17' r='10.5' fill='%23E2725B'/><path d='M4 17 L0.5 13 V21 Z' fill='%23F4A85C'/><path d='M28 17 L31.5 13 V21 Z' fill='%23F4A85C'/><circle cx='13' cy='15' r='1.6' fill='%231F2A2E'/><circle cx='12.7' cy='14.6' r='0.45' fill='%23FFFFFF'/><path d='M13 20 Q16 22.5 19 20' stroke='%231F2A2E' stroke-width='1.1' fill='none' stroke-linecap='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..600;1,9..144,500..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>
 /* exceljs@4.4.0 inlined from npm tarball package/dist/exceljs.min.js */
 /*! ExcelJS 19-10-2023 */
@@ -99,27 +100,44 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 </script>
 <style>
 :root {
-  --bg: #F4F1EA;
-  --card: #FFFFFF;
-  --surface-2: #EBE6D8;
-  --border: #E2DCCD;
-  --border-2: #EEE9DC;
-  --border-strong: #CFC8B8;
-  --ink: #14181C;
-  --ink-2: #454C57;
-  --muted: #847E72;
-  --muted-2: #B0AA9B;
-  --primary: #1B4965;
-  --primary-ink: #0E2A3B;
-  --primary-soft: #DAE5EE;
-  --accent: #B25538;
-  --accent-ink: #8A3E26;
-  --good: #4A7C59;
-  --warn: #B57820;
-  --warn-soft: #F5E8C9;
-  --bad: #A8313F;
-  --bad-soft: #F1D9DD;
-  --track: #E2DCCD;
+  /* Reef Desk brand tokens (sunset + lagoon) */
+  --rd-terracotta: #E2725B;
+  --rd-amber:      #F4A85C;
+  --rd-coral-soft: #FFD8C2;
+  --rd-lagoon:     #2B8C8C;
+  --rd-lagoon-deep:#1A5F66;
+  --rd-sand:       #FAF3E7;
+  --rd-shell:      #FFFFFF;
+  --rd-ink:        #1F2A2E;
+  --rd-ink-soft:   #5C6B70;
+  --rd-reef-line:  #E8DCC8;
+  --rd-success:    #4FA67A;
+  --rd-warning:    #E0A33C;
+  --rd-danger:     #C4533C;
+
+  /* Legacy variable names re-aliased through brand tokens.
+     Do not rename — CSS rules throughout the file reference these. */
+  --bg: var(--rd-sand);
+  --card: var(--rd-shell);
+  --surface-2: var(--rd-coral-soft);
+  --border: var(--rd-reef-line);
+  --border-2: #F0E7D4;
+  --border-strong: #D7C8AE;
+  --ink: var(--rd-ink);
+  --ink-2: #2F3C42;
+  --muted: var(--rd-ink-soft);
+  --muted-2: #8E9AA0;
+  --primary: var(--rd-lagoon);
+  --primary-ink: var(--rd-lagoon-deep);
+  --primary-soft: #D5EAEA;
+  --accent: var(--rd-terracotta);
+  --accent-ink: #B25538;
+  --good: var(--rd-success);
+  --warn: var(--rd-warning);
+  --warn-soft: #FBE9C7;
+  --bad: var(--rd-danger);
+  --bad-soft: #F4D8D2;
+  --track: var(--rd-reef-line);
   --shadow-sm: 0 1px 2px rgba(20, 24, 28, .05);
   --shadow-md: 0 1px 2px rgba(20, 24, 28, .04), 0 4px 12px -4px rgba(20, 24, 28, .08);
   --shadow-lg: 0 24px 48px -16px rgba(20, 24, 28, .18), 0 8px 16px -8px rgba(20, 24, 28, .1);
@@ -131,7 +149,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-  font-family: 'Onest', -apple-system, system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
   background: var(--bg);
   color: var(--ink);
   font-size: 14px;
@@ -162,23 +180,26 @@ border-bottom: 1px solid var(--border);
 display: flex; align-items: center; gap: 14px;
 padding: 12px 24px; max-width: 1400px; margin: 0 auto;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand {
+display: inline-flex; align-items: center; gap: 10px;
+background: transparent; border: 0; padding: 4px 8px;
+border-radius: 10px; cursor: pointer;
+font: inherit; color: inherit;
+transition: background .12s;
+}
+.brand:hover { background: var(--rd-coral-soft); }
+.brand:focus-visible { outline: 2px solid var(--rd-lagoon); outline-offset: 2px; }
 .brand-mark {
-width: 26px; height: 26px; border-radius: 7px;
-background: linear-gradient(135deg, var(--primary), #0c2c40);
-position: relative; flex-shrink: 0;
+width: 32px; height: 32px; flex-shrink: 0;
+display: inline-flex; align-items: center; justify-content: center;
 }
-.brand-mark::after {
-content: ""; position: absolute; inset: 5.5px;
-border: 1.5px solid rgba(255,255,255,.7);
-border-radius: 3px; border-bottom: none; border-right: none;
-transform: rotate(-30deg);
-}
+.brand-mark svg { display: block; width: 32px; height: 32px; }
 .brand-name {
-font-family: 'Fraunces', serif; font-size: 18px;
-font-weight: 500; letter-spacing: -.015em;
+font-family: 'Fraunces', Georgia, serif; font-size: 20px;
+font-weight: 600; letter-spacing: -.015em;
+color: var(--rd-lagoon-deep);
 }
-.brand-name em { font-style: italic; color: var(--primary); font-weight: 400; }
+.brand-dot { color: var(--rd-terracotta); }
 .spacer { flex: 1; }
 
 .btn {
@@ -195,9 +216,13 @@ white-space: nowrap;
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .btn-primary {
-background: var(--primary); border-color: var(--primary); color: white;
+background: var(--rd-terracotta); border-color: var(--rd-terracotta); color: white;
+box-shadow: 0 1px 0 rgba(20,24,28,.04);
 }
-.btn-primary:hover:not(:disabled) { background: var(--primary-ink); border-color: var(--primary-ink); }
+.btn-primary:hover:not(:disabled) {
+background: var(--rd-amber); border-color: var(--rd-amber);
+box-shadow: 0 2px 6px rgba(226,114,91,.28);
+}
 
 .btn-danger {
 color: var(--bad);
@@ -319,7 +344,7 @@ background-repeat: no-repeat; background-position: right 10px center;
 }
 .toolbar input:focus, .toolbar select:focus {
 border-color: var(--primary);
-box-shadow: 0 0 0 3px rgba(27, 73, 101, .12);
+box-shadow: 0 0 0 3px rgba(43, 140, 140, .15);
 }
 .search-wrap { position: relative; }
 .search-input {
@@ -579,7 +604,7 @@ background-repeat: no-repeat; background-position: right 12px center;
 }
 .field input:focus, .field select:focus, .field textarea:focus {
 border-color: var(--primary);
-box-shadow: 0 0 0 3px rgba(27, 73, 101, .12);
+box-shadow: 0 0 0 3px rgba(43, 140, 140, .15);
 }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
@@ -610,7 +635,7 @@ box-shadow: 0 0 0 3px rgba(27, 73, 101, .12);
 .<field.is>-error select:focus,
 .<field.is>-error textarea:focus {
   border-color: var(--bad);
-  box-shadow: 0 0 0 3px rgba(168, 49, 63, 0.15);
+  box-shadow: 0 0 0 3px rgba(196, 83, 60, 0.18);
 }
 .form-section {
   font-size: 11px;
@@ -704,7 +729,7 @@ box-shadow: var(--shadow-sm);
 }
 .dash-section.full { grid-column: 1 / -1; }
 .dash-section h3 {
-font-family: 'Onest', sans-serif; font-weight: 600;
+font-family: 'Inter', sans-serif; font-weight: 600;
 color: var(--ink-2); margin-bottom: 14px;
 text-transform: uppercase; letter-spacing: .08em; font-size: 11px;
 }
@@ -947,7 +972,7 @@ animation: spin .6s linear infinite;
 .saving-indicator {
   display: none; align-items: center; gap: 6px;
   padding: 4px 10px; border-radius: 999px;
-  background: rgba(133, 100, 55, 0.18); color: #6b502c;
+  background: rgba(224, 163, 60, 0.18); color: var(--rd-warning);
   font-size: 12px; font-weight: 500;
 }
 .saving-indicator.is-on { display: inline-flex; }
@@ -974,14 +999,14 @@ animation: spin .6s linear infinite;
   margin-right: 4px;
 }
 .pill-pending   { background: transparent; color: var(--muted); }
-.pill-attended  { background: rgba(74, 124, 89, 0.18); color: #3a6647; }
-.pill-noshow    { background: rgba(168, 90, 74, 0.18); color: #8c4636; }
-.pill-paid      { background: rgba(74, 124, 89, 0.18); color: #3a6647; }
-.pill-comp      { background: rgba(133, 100, 55, 0.18); color: #6b502c; }
-.pill-cancelled { background: rgba(168, 90, 74, 0.22); color: #8c4636; }
-.pill-postponed { background: rgba(133, 100, 55, 0.22); color: #6b502c; }
-.pill-good      { background: rgba(74, 124, 89, 0.18); color: #3a6647; }
-.pill-warn      { background: rgba(168, 90, 74, 0.22); color: #8c4636; }
+.pill-attended  { background: rgba(79, 166, 122, 0.18); color: var(--rd-success); }
+.pill-noshow    { background: rgba(196, 83, 60, 0.18); color: var(--rd-danger); }
+.pill-paid      { background: rgba(79, 166, 122, 0.18); color: var(--rd-success); }
+.pill-comp      { background: rgba(224, 163, 60, 0.18); color: var(--rd-warning); }
+.pill-cancelled { background: rgba(196, 83, 60, 0.22); color: var(--rd-danger); }
+.pill-postponed { background: rgba(224, 163, 60, 0.22); color: var(--rd-warning); }
+.pill-good      { background: rgba(79, 166, 122, 0.18); color: var(--rd-success); }
+.pill-warn      { background: rgba(196, 83, 60, 0.22); color: var(--rd-danger); }
 
 /* Strikethrough cancelled rows */
 .exc-table tr.row-cancelled td:not(.col-status) { color: var(--muted); text-decoration: line-through; }
@@ -989,12 +1014,12 @@ animation: spin .6s linear infinite;
 .exc-table tr.row-cancelled, .exc-table tr.row-postponed { opacity: 0.78; }
 
 /* Activity-cancelled banner on excursion card */
-.exc-card.is-day-cancelled { border-color: rgba(168, 90, 74, 0.5); }
+.exc-card.is-day-cancelled { border-color: rgba(196, 83, 60, 0.5); }
 .activity-cancelled-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 12px; background: rgba(168, 90, 74, 0.12);
-  border-bottom: 1px solid rgba(168, 90, 74, 0.35);
-  color: #8c4636; font-size: 13px; flex-wrap: wrap;
+  padding: 8px 12px; background: rgba(196, 83, 60, 0.12);
+  border-bottom: 1px solid rgba(196, 83, 60, 0.35);
+  color: var(--rd-danger); font-size: 13px; flex-wrap: wrap;
 }
 .activity-cancelled-banner .acb-main { flex: 1; min-width: 200px; }
 .activity-cancelled-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -1021,8 +1046,8 @@ animation: spin .6s linear infinite;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 12px; border-radius: 8px; margin: 8px 0; font-size: 13px;
 }
-.status-banner.is-cancelled { background: rgba(168, 90, 74, 0.14); color: #8c4636; }
-.status-banner.is-postponed { background: rgba(133, 100, 55, 0.14); color: #6b502c; }
+.status-banner.is-cancelled { background: rgba(196, 83, 60, 0.14); color: var(--rd-danger); }
+.status-banner.is-postponed { background: rgba(224, 163, 60, 0.14); color: var(--rd-warning); }
 
 /* Edit-modal Operations row (attendance + payment) */
 .op-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -1038,8 +1063,8 @@ animation: spin .6s linear infinite;
 
 /* Cancel-with-reason inline form */
 .cancel-inline {
-  margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(168, 90, 74, 0.3);
-  background: rgba(168, 90, 74, 0.06); border-radius: 8px;
+  margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(196, 83, 60, 0.3);
+  background: rgba(196, 83, 60, 0.06); border-radius: 8px;
 }
 .cancel-inline label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
 .cancel-inline textarea {
@@ -1066,19 +1091,78 @@ animation: spin .6s linear infinite;
 .btn-small { padding: 3px 9px; font-size: 11px; border-radius: 6px; }
 .btn-link-danger {
   background: transparent; border: 1px solid transparent;
-  color: #8c4636; padding: 4px 8px; cursor: pointer; font-size: 12px;
+  color: var(--rd-danger); padding: 4px 8px; cursor: pointer; font-size: 12px;
 }
-.btn-link-danger:hover { background: rgba(168, 90, 74, 0.08); border-color: rgba(168, 90, 74, 0.3); }
+.btn-link-danger:hover { background: rgba(196, 83, 60, 0.08); border-color: rgba(196, 83, 60, 0.3); }
+
+/* App footer */
+.app-footer {
+  padding: 14px 24px; text-align: right;
+  color: var(--rd-ink-soft); font-size: 0.8rem;
+  border-top: 1px solid var(--rd-reef-line);
+  background: var(--rd-sand);
+  max-width: 1400px; margin: 0 auto;
+}
+.app-footer .footer-name { color: var(--rd-lagoon); font-weight: 500; }
+
+/* Empty-state pufferfish */
+.empty-state .puffer-empty {
+  display: block; margin: 0 auto 14px;
+  width: 80px; height: 80px;
+  opacity: .6;
+}
+.empty-state .puffer-empty svg { width: 100%; height: 100%; }
+
+/* About modal */
+.about-modal { padding: 28px 24px 0; text-align: center; }
+.about-modal .puffer-empty {
+  display: block; margin: 0 auto 14px;
+  width: 72px; height: 72px;
+}
+.about-modal .puffer-empty svg { width: 100%; height: 100%; }
+.about-modal h2 {
+  font-family: 'Fraunces', Georgia, serif; font-weight: 600;
+  color: var(--rd-lagoon-deep); margin: 0 0 8px; padding: 0;
+  font-size: 24px;
+}
+.about-modal .tagline { color: var(--rd-ink); margin: 4px 0; padding: 0; }
+.about-modal .about-meta { color: var(--rd-ink-soft); margin: 2px 0; font-size: 0.85rem; }
+.about-modal .about-meta strong { color: var(--rd-lagoon); font-weight: 600; }
+.about-modal .foot {
+  margin-top: 20px; padding: 14px 24px 18px;
+  border-top: 1px solid var(--rd-reef-line);
+  display: flex; justify-content: center;
+}
 </style>
 
 </head>
 <body>
 <header>
   <div class="bar">
-    <div class="brand">
-      <div class="brand-mark"></div>
-      <div class="brand-name">Reef <em>Desk</em></div>
-    </div>
+    <button id="brand" class="brand" type="button" title="About Reef Desk" aria-label="About Reef Desk">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+          <!-- amber spikes -->
+          <polygon points="12,30 4,26 4,34" fill="#F4A85C"/>
+          <polygon points="13,18 8,11 17,12" fill="#F4A85C"/>
+          <polygon points="13,46 8,53 17,52" fill="#F4A85C"/>
+          <polygon points="51,18 56,11 47,12" fill="#F4A85C"/>
+          <polygon points="51,46 56,53 47,52" fill="#F4A85C"/>
+          <!-- lagoon tail fin behind body -->
+          <path d="M48 32 L60 22 L60 42 Z" fill="#2B8C8C"/>
+          <!-- round body -->
+          <circle cx="32" cy="34" r="18" fill="#E2725B"/>
+          <!-- belly highlight -->
+          <ellipse cx="30" cy="44" rx="11" ry="4" fill="#FFD8C2" opacity="0.55"/>
+          <!-- eye -->
+          <circle cx="25" cy="29" r="2.4" fill="#1F2A2E"/>
+          <circle cx="24.3" cy="28.3" r="0.8" fill="#FFFFFF"/>
+          <!-- smile -->
+          <path d="M22 39 Q28 43 35 39" stroke="#1F2A2E" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Reef Desk<span class="brand-dot">.</span></span>
+    </button>
     <div class="spacer"></div>
     <div id="status-area" style="display:none; gap: 6px; align-items:center;">
       <span id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">Ready</span></span>
@@ -1154,6 +1238,10 @@ animation: spin .6s linear infinite;
     <div id="view-container"></div>
   </section>
 </main>
+
+<footer class="app-footer">
+  Reef Desk · v5 · Crafted by <span class="footer-name">Maaji</span>
+</footer>
 
 <div id="modal-mount"></div>
 <div id="toast-mount"></div>
@@ -2877,7 +2965,7 @@ async function openDirectory(handle) {
     }
   }
   if (!specs.length) { toast('No .xlsx files in that folder', 'error'); return; }
-  toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
+  toast(`Surfacing ${specs.length} file${specs.length>1?'s':''}…`);
   await loadFiles(specs);
   showWorkspace();
   await offerCrashRecovery();
@@ -2967,7 +3055,7 @@ function pickFiles() {
       name: f.name, fileObj: f,
       getBytes: async () => new Uint8Array(await f.arrayBuffer()),
     }));
-    toast(`Loading ${specs.length} file${specs.length>1?'s':''}…`);
+    toast(`Surfacing ${specs.length} file${specs.length>1?'s':''}…`);
     await loadFiles(specs);
     showWorkspace();
   };
@@ -3100,7 +3188,7 @@ function renderAgenda() {
   const wrap = el('div');
   const d = STATE.selectedDate;
   if (!d) {
-    wrap.append(makeEmpty('No date selected', 'Pick a date in the strip above.'));
+    wrap.append(makeEmpty('Nothing scheduled. Time for a coffee.', 'Pick a date in the strip above.'));
     return wrap;
   }
 
@@ -3160,7 +3248,7 @@ function renderAgenda() {
 
   if (!sheets.length) {
     wrap.append(makeEmpty(
-      'No data for this date',
+      'Nothing scheduled. Time for a coffee.',
       STATE.excFilter
         ? `Try clearing the excursion filter or picking a different date.`
         : `Either no excursion sheets exist for ${fmtDateShort(d)}, or this filter excludes them all.`
@@ -3463,7 +3551,7 @@ function renderPeople() {
   wrap.append(heading);
 
   if (!entries.length) {
-    wrap.append(makeEmpty('No guests yet', 'When bookings are added, the guest list will appear here.'));
+    wrap.append(makeEmpty('Quiet reef today.', 'When bookings are added, the guest list will appear here.'));
     return wrap;
   }
 
@@ -3543,7 +3631,7 @@ function renderSearchResults() {
   wrap.append(heading);
 
   if (!list.length) {
-    wrap.append(makeEmpty('No matches', 'Try a different name, room number, or bill number.'));
+    wrap.append(makeEmpty("Nothing's biting. Try another search.", 'Try a different name, room number, or bill number.'));
     return wrap;
   }
 
@@ -3573,8 +3661,28 @@ function renderSearchResults() {
   return wrap;
 }
 
+const PUFFER_SVG = `
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <polygon points="12,30 4,26 4,34" fill="#F4A85C"/>
+  <polygon points="13,18 8,11 17,12" fill="#F4A85C"/>
+  <polygon points="13,46 8,53 17,52" fill="#F4A85C"/>
+  <polygon points="51,18 56,11 47,12" fill="#F4A85C"/>
+  <polygon points="51,46 56,53 47,52" fill="#F4A85C"/>
+  <path d="M48 32 L60 22 L60 42 Z" fill="#2B8C8C"/>
+  <circle cx="32" cy="34" r="18" fill="#E2725B"/>
+  <ellipse cx="30" cy="44" rx="11" ry="4" fill="#FFD8C2" opacity="0.55"/>
+  <circle cx="25" cy="29" r="2.4" fill="#1F2A2E"/>
+  <circle cx="24.3" cy="28.3" r="0.8" fill="#FFFFFF"/>
+  <path d="M22 39 Q28 43 35 39" stroke="#1F2A2E" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+</svg>`;
+
+function pufferfishGlyph() {
+  return el('span', {class: 'puffer-empty', html: PUFFER_SVG});
+}
+
 function makeEmpty(title, sub) {
   return el('div', {class:'empty-state'},
+    pufferfishGlyph(),
     el('h3', {}, title),
     el('p', {}, sub)
   );
@@ -3593,6 +3701,21 @@ function openModal(node){
   setTimeout(()=>{ const i = bg.querySelector('input,select,textarea'); if (i) i.focus(); }, 30);
 }
 function closeModal(){ $('#modal-mount').innerHTML = ''; }
+
+function openAboutModal() {
+  const body = el('div', {class:'about-modal'},
+    pufferfishGlyph(),
+    el('h2', {}, 'Reef Desk'),
+    el('p', {class:'tagline'}, 'A small, sturdy tool for running a dive center.'),
+    el('p', {class:'tagline'}, 'Built single-file, offline-first, on the reef.'),
+    el('p', {class:'about-meta'}, 'Version 5'),
+    el('p', {class:'about-meta'}, el('span', {}, 'Crafted by '), el('strong', {}, 'Maaji'), el('span', {}, '.')),
+    el('div', {class:'foot'},
+      el('button', {class:'btn btn-primary', onclick: closeModal}, 'Close')
+    )
+  );
+  openModal(body);
+}
 
 function openAddModal(prefill = {}) {
   // Build slots map: { excursionName -> [{date, capacity, filled, ...}] }
@@ -4865,10 +4988,7 @@ function renderStats() {
   wrap.append(opsStats);
 
   if (totalBookings === 0 && cancelledCount === 0 && daysCancelled === 0) {
-    wrap.append(el('div', {class:'empty-state'},
-      el('h3', {}, 'No bookings yet'),
-      el('p', {}, 'Stats will appear here once bookings are added.')
-    ));
+    wrap.append(makeEmpty('No numbers yet — give it a minute.', 'Stats will appear here once bookings are added.'));
     return wrap;
   }
 
@@ -5057,6 +5177,7 @@ function todayBookings() {
 /* ============================================================
    Wire-up
    ============================================================ */
+$('#brand').addEventListener('click', openAboutModal);
 $('#btn-open-folder').addEventListener('click', pickDirectory);
 $('#btn-open-files').addEventListener('click', pickFiles);
 $('#btn-add').addEventListener('click', () => openAddModal({dateISO: STATE.selectedDate}));
