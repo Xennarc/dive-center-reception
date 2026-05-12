@@ -69,6 +69,9 @@ function loadGenerator() {
   if (typeof sandbox.generateSurgicalWorkbook !== 'function') {
     throw new Error('generateSurgicalWorkbook not defined after extraction');
   }
+  // Expose extracted source for static-analysis assertions (e.g. catching
+  // forbidden createElement( usage in namespaced contexts).
+  sandbox.__extractedSurgical = surgical;
   return sandbox;
 }
 
@@ -383,6 +386,88 @@ async function main() {
       xml.includes(`${i} May 2026`),
       `sheet${i} title missing substituted date "${i} May 2026"`,
     );
+  }
+
+  // I. Namespace correctness — the regression that broke PR #29.
+  //
+  //    The browser's W3C-correct XMLSerializer emits xmlns="" on any element
+  //    that's in NO namespace under a default-namespaced parent. Excel
+  //    rejects the resulting file ("file format or file extension is not
+  //    valid") because, e.g., <Override xmlns="" .../> doesn't bind a
+  //    content type for our worksheets. @xmldom/xmldom silently drops the
+  //    namespace mismatch on serialization, hiding the bug in Node, so we
+  //    can't rely on the output alone — we also static-scan the production
+  //    code we extracted to ensure no createElement( calls remain in the
+  //    namespaced-XML rewrite paths.
+  console.log('  · namespace correctness:');
+
+  // I.1 Static scan of the extracted surgical-clone source.
+  const extractedSrc = ctx.__extractedSurgical || '';
+  assert.ok(extractedSrc.length, 'extracted surgical source missing — bug in test harness');
+  const stripped = extractedSrc.replace(/createElementNS\s*\(/g, ''); // mask legitimate calls
+  assert.ok(
+    !/\.createElement\s*\(/.test(stripped),
+    'createElement( found in surgical-clone block — use createElementNS so the new node inherits the parent\'s default namespace',
+  );
+
+  // I.2 Output string check — no xmlns="" anywhere in the rewritten parts.
+  const checkXmlnsEmpty = async (partName) => {
+    const xml = await outZip.file(partName).async('string');
+    assert.ok(
+      !xml.includes('xmlns=""'),
+      `${partName} contains xmlns="" — browser would emit this for any element appended without inheriting the parent's default namespace`,
+    );
+  };
+  await checkXmlnsEmpty('[Content_Types].xml');
+  await checkXmlnsEmpty('xl/_rels/workbook.xml.rels');
+  for (let i = 1; i <= 5; i++) await checkXmlnsEmpty(`xl/worksheets/sheet${i}.xml`);
+
+  // I.3 Re-parse and verify every Override / Relationship / is / t we
+  //     emitted is in the expected namespace.
+  const NS_CT   = 'http://schemas.openxmlformats.org/package/2006/content-types';
+  const NS_REL  = 'http://schemas.openxmlformats.org/package/2006/relationships';
+  const NS_SS   = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+  const ctDoc = new DOMParser().parseFromString(
+    await outZip.file('[Content_Types].xml').async('string'),
+    'application/xml',
+  );
+  const ctOverrides = ctDoc.getElementsByTagName('Override');
+  for (let i = 0; i < ctOverrides.length; i++) {
+    assert.strictEqual(
+      ctOverrides[i].namespaceURI, NS_CT,
+      `Override[${i}] PartName=${ctOverrides[i].getAttribute('PartName')} has wrong namespaceURI (${ctOverrides[i].namespaceURI})`,
+    );
+  }
+  const relDoc = new DOMParser().parseFromString(
+    await outZip.file('xl/_rels/workbook.xml.rels').async('string'),
+    'application/xml',
+  );
+  const relRels = relDoc.getElementsByTagName('Relationship');
+  for (let i = 0; i < relRels.length; i++) {
+    assert.strictEqual(
+      relRels[i].namespaceURI, NS_REL,
+      `Relationship[${i}] Id=${relRels[i].getAttribute('Id')} has wrong namespaceURI (${relRels[i].namespaceURI})`,
+    );
+  }
+  for (let i = 1; i <= 5; i++) {
+    const sDoc = new DOMParser().parseFromString(
+      await outZip.file(`xl/worksheets/sheet${i}.xml`).async('string'),
+      'application/xml',
+    );
+    const inlineCells = [];
+    const allCells = sDoc.getElementsByTagName('c');
+    for (let j = 0; j < allCells.length; j++) {
+      if (allCells[j].getAttribute('t') === 'inlineStr') inlineCells.push(allCells[j]);
+    }
+    assert.ok(inlineCells.length > 0, `sheet${i} should have at least one inlineStr cell (the substituted title)`);
+    for (const c of inlineCells) {
+      const is = c.getElementsByTagName('is')[0];
+      assert.ok(is, `sheet${i} inlineStr cell ${c.getAttribute('r')} missing <is>`);
+      assert.strictEqual(is.namespaceURI, NS_SS, `sheet${i} <is> in cell ${c.getAttribute('r')} has wrong namespaceURI (${is.namespaceURI})`);
+      const tNode = is.getElementsByTagName('t')[0];
+      assert.ok(tNode, `sheet${i} <is> missing <t>`);
+      assert.strictEqual(tNode.namespaceURI, NS_SS, `sheet${i} <t> in cell ${c.getAttribute('r')} has wrong namespaceURI (${tNode.namespaceURI})`);
+    }
   }
 
   console.log('5. xmllint --noout on every XML part');
