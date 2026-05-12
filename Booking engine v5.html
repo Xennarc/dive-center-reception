@@ -4297,7 +4297,14 @@ function parseFlexDate(s) {
   s = String(s).trim();
   const iso = parseDateValue(s);
   if (iso) return iso;
-  let m = s.match(/^(\d{1,2})[\/\-\s\.]+([A-Za-z]{3,9})[\/\-\s\.,]+(\d{2,4})$/);
+  // TRML / TRMD reports use DD-MM-YY (e.g. "01-05-26"). parseDateValue
+  // requires a 4-digit year, so handle the 2-digit case here.
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y += 2000;
+    return isoFromParts(y, +m[2], +m[1]);
+  }
+  m = s.match(/^(\d{1,2})[\/\-\s\.]+([A-Za-z]{3,9})[\/\-\s\.,]+(\d{2,4})$/);
   if (m) {
     const mo = MONTH_NAMES[m[2].toLowerCase().slice(0,3)];
     if (mo) {
