@@ -943,12 +943,43 @@ function copyColumns(srcWs, destWs) {
   }
 }
 
+function buildMergedNonAnchorSet(srcWs) {
+  // OOXML rejects <c> elements inside a merge range for cells other than
+  // the top-left anchor — Excel flags the workbook as needing recovery.
+  const set = new Set();
+  if (!srcWs.model || !Array.isArray(srcWs.model.merges)) return set;
+  const colToNum = (letters) => {
+    let n = 0;
+    for (let i = 0; i < letters.length; i++) {
+      n = n * 26 + (letters.charCodeAt(i) - 64);
+    }
+    return n;
+  };
+  for (const range of srcWs.model.merges) {
+    const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(String(range).toUpperCase());
+    if (!m) continue;
+    const c1 = colToNum(m[1]), r1 = parseInt(m[2], 10);
+    const c2 = colToNum(m[3]), r2 = parseInt(m[4], 10);
+    const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+    const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+    for (let r = minR; r <= maxR; r++) {
+      for (let c = minC; c <= maxC; c++) {
+        if (r === minR && c === minC) continue;
+        set.add(c + ',' + r);
+      }
+    }
+  }
+  return set;
+}
+
 function copyRows(srcWs, destWs, dateContext) {
+  const suppressed = buildMergedNonAnchorSet(srcWs);
   srcWs.eachRow({ includeEmpty: true }, (row, rowNum) => {
     const destRow = destWs.getRow(rowNum);
     if (row.height) destRow.height = row.height;
     if (row.hidden) destRow.hidden = row.hidden;
-    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+    row.eachCell((cell, colNum) => {
+      if (suppressed.has(colNum + ',' + rowNum)) return;
       const destCell = destRow.getCell(colNum);
       let val = cell.value;
       if (val && typeof val === 'object' && val.formula) {
