@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "node test.js"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1"
+  }
+}
