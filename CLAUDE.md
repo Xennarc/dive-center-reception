@@ -4,101 +4,118 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository shape
 
-This repo is **not** a typical app project — there is no `package.json`, no build system, no test runner, no linter. Each `Booking engine v*.html` is a fully self-contained single-page app (HTML + inlined CSS + inlined JS + inlined `ExcelJS` and `pdfjs-dist` libraries). The "dev loop" is opening the HTML file directly in a Chromium-based browser.
+No package manager, no build system, no test runner for the apps themselves — each `Booking engine v*.html` is a self-contained single-page app (HTML + inlined CSS + inlined JS + inlined `ExcelJS`, `JSZip`, and `pdfjs-dist`). Dev loop = open the file in a Chromium browser.
 
-Versions are kept **side-by-side**, not overwritten. `Booking engine v5.html` (~4705 lines, ~2.5 MB) is the current canonical app; `Booking engine v4.html` (~4221 lines) and `Booking engine v3.3 (offline).html` are the build pipeline inputs and stay at the repo root because `make-v4.sh` / `make-v5.sh` reference root-relative paths. Pure-history files (`Booking engine v3.2.html`, `V2 Booking engine.html`, `v3-bookings.html`, `Booking sheets unified V1.html`, plus the `Booking engine v4 copy.html` / `Booking engine v4 - Ops preview.html` scratch files) live under `archive/` and should generally not be edited unless explicitly requested. Sample PDFs for the inhouse-meal-plan parser live in `samples/`.
+Versions live side-by-side. **`Booking engine v5.html`** (~5295 lines, ~2.7 MB) is canonical. `Booking engine v4.html` and `Booking engine v3.3 (offline).html` stay at the repo root because `make-v4.sh` / `make-v5.sh` reference them. All pure-history files (`v3.2`, `V2`, `v3-bookings`, `Booking sheets unified V1`, scratch v4 copies) live in `archive/`; don't edit them. Sample PDFs in `samples/`.
 
-## Building v5 from v4 (and v4 from v3.3)
+Sibling tool **`sheet-shaper.html`** (~1419 lines) — see its own section below.
 
-Each version is built by applying one patch on top of the previous one:
+Node-side: `package.json` declares `npm test` → `node test.js`, devDeps `@xmldom/xmldom`, `exceljs`, `jszip`. `benchmark.js` is a one-off perf microbench (safe to ignore). `.gitignore` covers `node_modules`, `package-lock.json`, `.claude/worktrees/`.
 
-```sh
-sh make-v4.sh   # v3.3 → v4: autofill + PDF management
-sh make-v5.sh   # v4  → v5: multi-user sync
-```
-
-`make-v4.sh` `cp`s `Booking engine v3.3 (offline).html` to `Booking engine v4.html` and applies `patches/0001-autofill-and-pdf-management.patch`. `make-v5.sh` does the same for `Booking engine v4.html` → `Booking engine v5.html` with `patches/0002-multi-user-sync.patch`. Both scripts rewrite the patch's filename paths on the fly. See `patches/README.md` for context — the patches exist because some agent tooling couldn't transmit the 2.5 MB+ files through a single tool call. If you make further changes to v5, edit `Booking engine v5.html` directly and commit it as a binary blob; only re-run `make-v5.sh` when starting from a clean v4. The patch is a snapshot of the original v4→v5 transition; subsequent v5 changes (tab-close safety, etc.) live only in the committed `Booking engine v5.html`.
+The `patches/` directory + `make-v*.sh` scripts exist only as a delivery fallback for when agent tooling can't transmit the 2.5 MB+ HTML in one tool call — see `patches/README.md`. v5 is edited directly; don't try to rebuild it from a patch unless you're starting from a clean v4.
 
 ## Reading the HTML files
 
-The HTML files are too large to `Read` whole-file. Use line offsets (numbers below are for v5):
+`Booking engine v5.html` is too large to `Read` whole-file. Use line offsets:
 
-- Lines 1–10: `<head>`, fonts, meta.
-- Lines 11–58: inlined ExcelJS@4.4.0 — **skip**.
-- Lines 59–83: inlined pdfjs-dist@3.11.174 (main bundle) — **skip**.
-- Lines 84–1056: `<style>` block.
-- Lines 1059–1146: `<body>` markup (header with `#status-pill` + `#saving-indicator` + `#btn-save`, welcome card, `#workspace`, `#modal-mount`, `#toast-mount`, hidden `#file-input` / `#pdf-input`).
-- Lines 1147–4702: the application `<script>`. The pdf.js **worker** is inlined as a string literal in the first ~50 lines of this script; ignore that block when grepping. After it, top-level `const STATE = { … }` (line 1159) and named sections delimited by `/* === … === */` banners.
+- **1–11** — `<head>`, fonts, meta.
+- **12–59** — inlined ExcelJS@4.4.0 — **skip**.
+- **60–75** — inlined JSZip@3.10.1 — **skip**. (Used by Save preservation.)
+- **76–100** — inlined pdfjs-dist@3.11.174 — **skip**.
+- **101–1136** — `<style>` block (one in-style banner at **965**: "Operational tracking — status pills, banners, capacity override, saving indicator").
+- **1139–1250** — `<body>` markup (`#status-pill`, `#saving-indicator`, `#btn-save`, `#workspace`, `#modal-mount`, `#toast-mount`, hidden `#file-input` / `#pdf-input`).
+- **1251–5292** — application `<script>`. The pdf.js **worker** is inlined as a string literal in the first ~50 lines of this script; ignore that block when grepping. `const STATE = { … }` at **1273**.
 
-Use `grep -n '/\* ============================================================' "Booking engine v5.html"` to jump between sections, then read the line below each banner for the section name. Current section banners (line → name):
+`grep -n '/\* ====' "Booking engine v5.html"` jumps between sections. Current banners:
 
 | Line | Section |
 |------|---------|
-| 1148 | Reef Desk — unified booking interface (ExcelJS edition) |
-| 1204 | Date helpers |
-| 1257 | Cell helpers |
-| 1291 | Layout detection |
-| 1438 | Booking I/O |
-| 1593 | Meta sheets (hidden) — booking-level + sheet-level extras |
-| 1812 | File load |
-| 1914 | Save / reload |
-| 2059 | **Sync (multi-user)** |
-| 2414 | File source |
-| 2539 | View shell |
-| 2596 | Date strip |
-| 2645 | Main view dispatch |
-| 2658 | Agenda view (selected date) |
-| 2983 | People (guests) view |
-| 3072 | Search results (across all dates / guests) |
-| 3129 | Modals |
-| 3689 | Inhouse PDF parsing |
-| 4192 | Inhouse reports modal |
-| 4308 | Stats dashboard |
-| 4596 | Wire-up |
-
-(One additional banner at line 925 lives inside `<style>` — "Operational tracking — status pills, banners, capacity override, saving indicator".)
+| 1252 | Reef Desk — unified booking interface |
+| 1317 | Date helpers |
+| 1370 | Cell helpers |
+| 1404 | Layout detection |
+| 1551 | Booking I/O |
+| 1706 | Meta sheets (hidden) |
+| 1925 | File load |
+| 2027 | Save / reload |
+| **2217** | **Save preservation** |
+| 2585 | Sync (multi-user) |
+| 2940 | File source |
+| 3065 | View shell |
+| 3122 | Date strip |
+| 3171 | Main view dispatch |
+| 3184 | Agenda view (selected date) |
+| 3521 | People (guests) view |
+| 3614 | Search results |
+| 3691 | Modals |
+| 4266 | Inhouse PDF parsing |
+| 4780 | Inhouse reports modal |
+| 4896 | Stats dashboard |
+| 5184 | Wire-up |
 
 ## Architecture
 
-**Single global `STATE`** (line 1159) holds everything: `mode` (`'fs'` File System Access API vs `'fp'` manual file picker), `view` (`'agenda' | 'people' | 'stats'`), `dirHandle`, `files[]`, `bookings[]`, `excursions[]`, `excFilter`, `search`, `selectedDate` (ISO), `showCancelled`, `inhouseGuests[]`, `inhouseReports[]`, `userId` (operator name, persisted at `localStorage['reefdesk:userId']`), `saving` (Set of filenames currently mid-save). Renders are pull-based: mutate `STATE`, then call `renderView()` / `renderDateStrip()` / `updateStatus()` / `updateSavingIndicator()`.
+**Single global `STATE`** (line 1273) holds everything: `mode` (`'fs'` File System Access API vs `'fp'` manual file picker), `view` (`'agenda' | 'people' | 'stats'`), `dirHandle`, `files[]`, `bookings[]`, `excursions[]`, `excFilter`, `search`, `selectedDate` (ISO), `showCancelled`, `inhouseGuests[]`, `inhouseReports[]`, `userId` (operator name, persisted at `localStorage['reefdesk:userId']`), `saving` (Set of filenames currently mid-save). Renders are pull-based: mutate `STATE`, then call `renderView()` / `renderDateStrip()` / `updateStatus()` / `updateSavingIndicator()`.
 
-**One Excel file = one excursion; one sheet = one day.** `detectLayout(ws)` scans the first ~20 rows for a row containing both a "room" and "guest" header (regex map in `HEADER_KEYS`), then walks back up to find the excursion title and capacity. Files whose layout can't be detected are skipped. `~$` lock files and the two hidden meta sheets are filtered out at load time.
+**One Excel file = one excursion; one sheet = one day.** `detectLayout(ws)` scans the first ~20 rows for a row with both "room" and "guest" headers (`HEADER_KEYS`), then walks back up to find the excursion title and capacity. Unrecognised files, `~$` lock files, and the two hidden meta sheets are filtered at load time.
 
-**Hidden meta sheets** (`_BookingMeta`, `_SheetMeta`) carry data the original spreadsheet format doesn't have a column for: per-row `status` / `cancelReason` / `attended` / `paid` / postpone log, and per-sheet `activityCancelled` / `customCapacity`. Constants `META_BOOKING_SHEET`, `META_SHEET_SHEET`, `BOOKING_META_COLS`, `SHEET_META_COLS`, `BOOKING_META_DEFAULTS`, `SHEET_META_DEFAULTS` define the schema. `readMetaSheets(wb)` builds the in-memory maps on load; `flushMetaSheets(fileEntry)` writes them back before `wb.xlsx.writeBuffer()` runs in `saveAll()`. Always go through `getBookingMeta` / `setBookingMeta` / `getSheetMeta` / `setSheetMeta` so dirty-tracking stays correct.
+**Hidden meta sheets** (`_BookingMeta`, `_SheetMeta`) carry data the spreadsheet format lacks columns for: per-row `status` / `cancelReason` / `attended` / `paid` / postpone log; per-sheet `activityCancelled` / `customCapacity`. Schema constants: `META_BOOKING_SHEET`, `META_SHEET_SHEET`, `BOOKING_META_COLS`, `SHEET_META_COLS`, `BOOKING_META_DEFAULTS`, `SHEET_META_DEFAULTS`. `readMetaSheets(wb)` builds the in-memory maps on load; `flushMetaSheets(fileEntry)` writes them back before `wb.xlsx.writeBuffer()` in `saveAll()`. Always go through `getBookingMeta` / `setBookingMeta` / `getSheetMeta` / `setSheetMeta` so dirty-tracking stays correct.
 
-**Two file source modes** share the same `loadFiles(specs)` shape:
+**Two file-source modes** share the same `loadFiles(specs)` shape:
 
-- `'fs'` — `pickDirectory()` → `showDirectoryPicker({ mode: 'readwrite' })` → `openDirectory(handle)` (line 2416). `saveAll()` writes via `fileHandle.createWritable()`. `openDirectory` also sweeps stale `~$*.savelock.*` files left by crashed tabs and, after `loadFiles`, calls `offerCrashRecovery()` to surface any persisted pendingOps. The "Open shared folder" button hides itself when `showDirectoryPicker` is missing.
-- `'fp'` — `pickFiles()` uses `<input type="file" multiple accept=".xlsx">`. `saveAll()` falls back to a download blob (one per dirty file). `reload`, sync, and crash recovery are all no-ops in this mode.
+- `'fs'` — `showDirectoryPicker({ mode: 'readwrite' })` → `openDirectory(handle)`. `saveAll()` writes via `fileHandle.createWritable()`. `openDirectory` sweeps stale `~$*.savelock.*` files and calls `offerCrashRecovery()` after `loadFiles`.
+- `'fp'` — `<input type="file" multiple accept=".xlsx">`. `saveAll()` falls back to a download blob. `reload`, sync, and crash recovery are no-ops in this mode.
 
-**Inhouse PDF parsing** (TRML / TRMD daily meal-plan reports) uses pdf.js text items with x/y coordinates rather than naive line-extraction. Header detection (`classifyInhouseHeader`) recognises a wide vocab (room/cabin/villa/suite/unit, name/guest/booker, arrival/checkin, departure/checkout, plus neighbours like type/ta/meal/rate so column-range splitting has tight boundaries). Falls back to filename-based date parsing (`parseFilenameDate`) when the report header doesn't carry one — for ambiguous DDMM/MMDD blocks it picks the date closer to today. `lookupInhouse(room, dateISO)` deliberately falls back to the **most recent record for the room** when no date is given or the booking date is outside the guest's stay; this drives the autofill in the New Booking modal even when the loaded reports are stale, and stale/out-of-range cases are surfaced in the modal status hint via `tryAutofill()`.
+### Save preservation (line 2217)
 
-## Multi-user sync (v5 only)
+ExcelJS's `writeBuffer()` round-trips the workbook through its own model and drops parts it doesn't understand (drawings, external links, threaded comments, conditional formatting, printer settings, charts, tables, …). Excel then refuses the resulting `.xlsx` with the "We found a problem with some content" recovery dialog. `applyPreservation()` (constants `PRESERVED_PART_PREFIXES`, `PRESERVED_COMMENTS_RE`; helper `isPreservedPath`) unzips both the original `.xlsx` and ExcelJS's output, splices preserved parts back verbatim, merges `[Content_Types].xml` and `*.rels`, and runs the merge-orphan fix (strip stray `<c>` inside a `<mergeCell>` that isn't the anchor — Excel rejects those too). This is why JSZip is inlined alongside ExcelJS. `?diag=1` dumps the pre-preservation diff. Save order is fixed: **ExcelJS write → preserve → file write** — don't reorder.
 
-`saveAll()` in v4 overwrote each .xlsx wholesale, so concurrent saves on the SMB share clobbered each other. v5 adds a `/* === Sync (multi-user) === */` banner at line 2059 (between `Save / reload` and `File source`) that makes saves merge against the current disk version and survive tab close. `'fs'` mode only — `'fp'` is sync-disabled by design. v4 retains the unsafe single-user behaviour.
+### Multi-user sync (line 2585; `'fs'` mode only)
 
-- **Op-log replay.** `writeBooking` (line 1474), `setBookingMeta` (line 1751), `setSheetMeta` (line 1781) each push a structured op into `f.pendingOps` next to their existing `f.dirty = true`. `bookingTempId` threads a create through later meta ops on the same row (cancel-after-create); `txnId` keeps multi-op flows like `postponeBooking` atomic at replay. A module-level `replaying` flag suppresses `recordOp` and the `rebuildBookings()` call inside `writeBooking`. `replayOps(fileEntry, ops)` is shared by the conflict path (`saveAll` after a remote-mtime change) and the crash-recovery path (`offerCrashRecovery` after reopening the folder).
-- **Save flow** (`saveAll`, line 1916). Snapshot `const ops = f.pendingOps.slice()` *before* any await, add `f.name` to `STATE.saving` and call `updateSavingIndicator()`, acquire lock, stat `lastModified`. Equal to `f.lastSyncedMtime` → fast path; else `reloadFile(f)` and replay `ops` grouped by `txnId`, reallocating `intendedRow` when a new booking's row is now occupied. Re-stat **after** `close()`. Splice the snapshotted prefix off `f.pendingOps` — never reassign `[]`, or ops queued during the await are lost — then `persistPendingOps(f)` to clear the localStorage mirror. The `finally` block removes from `STATE.saving`, calls `updateSavingIndicator()`, and releases the lock (also removing from `_heldLocks`).
-- **Locks.** `~$<filename>.savelock.<sessionId>` in `STATE.dirHandle`. Two-phase: write candidate, list `~$<filename>.savelock.*`, drop entries whose own `lastModified` is older than 12s (judge by lock-file mtime, not the JSON `ts` — SMB clocks drift), smallest sessionId wins. 10s heartbeat while held; release via `dirHandle.removeEntry(name)`. Held locks are also tracked in a module-level `_heldLocks` Set so the `pagehide` handler can drain them best-effort (fire-and-forget removeEntry) and peers don't wait the full 12s after a clean tab close. The lock is **advisory** — `acquireLock` returning null does not block the save; the mtime check + replayOps is the real safety net. The existing `~$` load filter in `openDirectory` already excludes lock files.
-- **Background poll.** 8s `setInterval` while visible (`_pollTimer`); paused on `document.hidden`; skips `STATE.saving` files; guards on `dirHandle.queryPermission({mode:'readwrite'}) === 'granted'` (post-sleep downgrade aborts the tick silently). Remote mtime advanced on a non-dirty file → silent `reloadFile(f)` + "Updated by …" toast; on a dirty file → `f.remoteChanged = true` so the next save forces the conflict branch. View state lives on `STATE`, so re-renders preserve agenda position.
-- **`reloadFile(fileEntry)`** (line 1867) — extracted from `loadFiles`'s per-file body, reused by poller and conflict path; does not touch view state.
-- **User identity.** `STATE.userId` prompted once via an in-page `el()` modal (not browser `prompt()`), persisted at `localStorage['reefdesk:userId']`, embedded in lock contents and "Updated by …" toasts. `loadUserId` runs at workspace bootstrap; `ensureUserId` prompts only on first run.
-- **Crash recovery.** Each `recordOp` (line 2095) mirrors the file's full op queue under `localStorage['reefdesk:pendingOps:<dirHandle.name>:<filename>']` via `persistPendingOps`. The splice-after-save and the Discard path both clear it. `openDirectory` calls `offerCrashRecovery()` (line 2452) after `loadFiles` to surface a Restore/Discard modal listing each affected file and op count; Restore runs `replayOps` against the freshly-loaded workbook and re-marks dirty so a normal Save persists. `'fp'` mode skips persistence (no stable folder identity, so `_opsKey` returns null).
-- **Save-in-flight UI.** A `#saving-indicator` "Saving — please don't close" pill in the header (CSS at line ~931) is toggled by `updateSavingIndicator()` (line 2589) on every `STATE.saving.add/delete`. The `beforeunload` handler also blocks on `STATE.saving.size > 0`, not just dirty files — a tab killed mid-write can corrupt the .xlsx, so the prompt is worth showing.
+v4 overwrote each `.xlsx` wholesale, so two operators on an SMB share would clobber each other. v5 fixes this with:
+
+- **Op-log replay.** `writeBooking` / `setBookingMeta` / `setSheetMeta` push structured ops into `f.pendingOps` (alongside `f.dirty = true`). On save, if disk `lastModified` advanced since load, `reloadFile(f)` and `replayOps` replay the ops onto the fresh workbook before write. `bookingTempId` threads create-then-meta flows; `txnId` keeps multi-op flows atomic.
+- **Advisory locks.** `~$<filename>.savelock.<sessionId>` in `dirHandle`. Two-phase acquire, 12 s stale TTL judged by lock-file mtime, 10 s heartbeat, drained best-effort by `pagehide` from a module-level `_heldLocks` Set. Lock is advisory — the mtime check + `replayOps` is the real safety net.
+- **Background poll.** 8 s `setInterval` while visible (`document.hidden` pauses it; permission downgrade aborts the tick silently). Remote mtime advanced on a non-dirty file → silent `reloadFile` + "Updated by …" toast; on a dirty file → `f.remoteChanged = true` so the next save forces the conflict branch.
+- **User identity.** Prompted once via an in-page `el()` modal, persisted at `localStorage['reefdesk:userId']`, embedded in lock contents and toasts.
+- **Crash recovery.** Each op also mirrors to `localStorage['reefdesk:pendingOps:<dirHandle.name>:<filename>']`. `openDirectory` calls `offerCrashRecovery()` after load; Restore re-runs `replayOps` against the fresh workbook. `'fp'` mode skips persistence.
+- **Save-in-flight UI.** A `#saving-indicator` pill is toggled by `updateSavingIndicator()` on every `STATE.saving.add/delete`. `beforeunload` blocks on `STATE.saving.size > 0` (not just dirty files), because a tab killed mid-write can corrupt the `.xlsx`.
+
+### Inhouse PDF parsing (line 4266)
+
+TRML / TRMD daily meal-plan reports are parsed via pdf.js text items with x/y coordinates rather than naive line extraction (`classifyInhouseHeader` recognises a wide vocab; falls back to `parseFilenameDate` when the header lacks a date). `lookupInhouse(room, dateISO)` deliberately falls back to the **most recent record for the room** when no date is given or the booking date is outside the guest's stay — this is what drives the autofill in the New Booking modal even with stale reports; stale/out-of-range cases surface in the modal status hint via `tryAutofill()`.
+
+## Sheet Shaper (`sheet-shaper.html`)
+
+Standalone Reef Desk companion tool, **not a v6**. Drop a folder of empty excursion masters, pick which weekdays each runs, generate clean dated workbooks for a target month — output feeds back into the booking engine.
+
+- Own `STATE` (~line 633: `mode`, `dirHandle`, `outDirHandle`, `masters`, `targetMonth`, `format`), own `el()` helper, own CSS. localStorage key `sheetshaper.daypatterns.v1` (no `reefdesk:` prefix). `Booking engine v5.html` has no reference to it; treat it as a sibling, not a sub-page.
+- Generator entry point: `generateAll()` (~line 1305) — a **surgical XML-level workbook clone** that bypasses ExcelJS's write path entirely. This avoids the same recovery-dialog corruption that drove the Save-preservation pipeline in v5.
+- **Load-bearing markers:** `/* === DATE HELPERS BEGIN === */ … END === */` (~672–723) and `/* === SURGICAL CLONE BEGIN === */ … END === */` (~962–1286). `test.js` extracts these blocks by regex and runs them in a Node `vm` sandbox — **do not remove or rename them.**
+- Only JSZip 3.10.1 is inlined; no ExcelJS, no pdf.js. Update by replacing the whole minified block from the upstream npm tarball.
+
+## Tests
+
+`npm test` (= `node test.js`) is the only automated check in the repo. Requires `npm install` first (`node_modules/` and `package-lock.json` are gitignored). devDeps: `@xmldom/xmldom`, `exceljs`, `jszip`.
+
+The test extracts the two BEGIN/END blocks from `sheet-shaper.html`, runs them under `vm.runInContext` with `@xmldom/xmldom` standing in for the browser DOM, builds a synthetic Reef-Desk-shaped master via ExcelJS, runs the generator, then asserts the output zip is structurally clean: correct sheet count, `[Content_Types].xml` and workbook rels updated, no `xmlns=""` anywhere (the W3C-correct browser serialiser emits this for any element appended without inheriting the parent's default namespace — that's the regression PR #29 fixed; the test guards by both static-scanning the extracted source for `createElement(` and string-checking the output), no `calcChain`, no value-carrying `<c>` inside a non-anchor merge cell, and `{{date}}` substitution applied. Optionally runs `xmllint --noout` on every XML part and a `soffice --convert-to xlsx` round-trip — both skipped silently when not on PATH (don't add hard installs).
+
+`benchmark.js` is unrelated; ignore unless touching the unique-rooms code path.
 
 ## Conventions
 
-- Don't introduce a build system, framework, or package manager. The whole point is that this app runs by double-clicking the HTML.
-- Don't extract helpers into separate files. Keep code in the `<script>` block, grouped under the existing `/* === … === */` section banners.
-- DOM construction uses the `el(tag, attrs, ...children)` helper near the top of the script (line 1181, handles `class`, `html`, `style`-as-object, and `on*` listeners). New UI should use it rather than ad-hoc `document.createElement` chains.
-- New modals: open with `openModal(node)` and close with `closeModal()`. There is no modal stack — opening a second modal overwrites the first; the userId modal and the recovery modal are intentionally non-concurrent in practice.
-- Anything that may need to survive a tab close should round-trip through `localStorage` under the `reefdesk:` key prefix (see `reefdesk:userId`, `reefdesk:pendingOps:…`).
-- Never edit the inlined ExcelJS / pdf.js / pdf.worker blocks by hand. If they need updating, replace the whole block from the upstream npm tarball.
-- Folder access requires a Chromium browser opened directly (not an iframe). State this in user-facing copy when relevant — the welcome card already does.
-- Keyboard shortcuts (defined in the Wire-up section, line 4596): Cmd/Ctrl+S save, Cmd/Ctrl+N new booking, Cmd/Ctrl+K focus search, Esc closes modal or clears search, Left/Right arrows move the selected date. `beforeunload` warns when any file is dirty **or** a save is in flight; `pagehide` drains `_heldLocks` best-effort.
+- No build system, no framework, no package manager for the apps. Double-click the HTML; that's the dev loop.
+- Don't extract helpers into separate files. Keep code in the `<script>` block, grouped under the existing `/* === … === */` banners.
+- DOM construction uses `el(tag, attrs, ...children)` (line 1181 in v5; supports `class`, `html`, `style`-as-object, `on*` listeners). Use it rather than ad-hoc `document.createElement` chains.
+- New modals: `openModal(node)` / `closeModal()`. There is no modal stack — opening a second overwrites the first.
+- State that must survive a tab close round-trips through `localStorage` under the `reefdesk:` prefix (or `sheetshaper.` for Sheet Shaper).
+- Never edit the inlined ExcelJS / JSZip / pdf.js / pdf.worker blocks by hand. Replace the whole block from upstream if updating.
+- Folder access requires a Chromium browser opened directly (not an iframe). The welcome card already says so where it matters.
+- Keyboard shortcuts (Wire-up, line 5184): Cmd/Ctrl+S save, Cmd/Ctrl+N new booking, Cmd/Ctrl+K focus search, Esc closes modal or clears search, Left/Right arrows move the selected date. `beforeunload` warns when any file is dirty **or** a save is in flight; `pagehide` drains `_heldLocks` best-effort.
+- Prefer `Edit` over `Write` for v5 modifications so only the diff is transmitted (the file is ~2.7 MB).
 
 ## Git workflow
 
-Working branch for this session: `claude/booking-engine-safety-features-4vcMQ`. Develop, commit, and push to that branch. Don't push to `main`. (The branch name varies per session — check the system prompt at the top of each new session before committing.)
+Each session is on its own working branch (check the system prompt at the top of the session). Develop, commit, and push to that branch. **Don't push to `main`.**
 
-Note that `Booking engine v4.html` and `v5.html` are each ~2.5 MB; some agent tooling can't transmit them through a single tool call. If a push fails for size/proxy reasons, capture the change as a patch under `patches/` and document it in `patches/README.md` (this is exactly how v4 itself was delivered — see `.branch-notes.md` and `patches/0001-autofill-and-pdf-management.patch`). Prefer `Edit` over `Write` for v5 modifications so only the diff is transmitted.
+If a push fails for size/proxy reasons on a v4/v5 HTML edit, capture the change as a patch under `patches/` and document it in `patches/README.md` — that's exactly how v4 itself was delivered (see `patches/0001-autofill-and-pdf-management.patch`). For changes that only touch v5 going forward, edit `Booking engine v5.html` directly and commit it as a binary blob; only re-run `make-v5.sh` when starting from a clean v4.
