@@ -2,3 +2,4 @@
 .claude-write-test.txt
 .claude/worktrees/
 node_modules
+package-lock.json

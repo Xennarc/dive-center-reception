@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Onest:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root {
   --bg: #F4F1EA;
@@ -577,6 +578,7 @@ gap: 14px;
       <div class="format-picker">
         <label>Tab name format</label>
         <select id="format-picker">
+          <option value="D">5</option>
           <option value="DD-MMM">05-May</option>
           <option value="DD MMM">05 May</option>
           <option value="DD-MM">05-05</option>
@@ -620,7 +622,7 @@ const STATE = {
   outDirHandle: null,  // output subfolder handle
   masters: [],         // [{name, fileHandle?, fileObj, workbook, templateSheet, days:[7]bool}]
   targetMonth: '',     // 'YYYY-MM'
-  format: 'DD-MMM',
+  format: 'D',
 };
 
 const DAY_LABELS = ['M','T','W','T','F','S','S']; // Mon..Sun
@@ -653,7 +655,8 @@ function toast(msg, kind = '') {
   setTimeout(() => t.remove(), 3500);
 }
 
-/* ===== Date helpers ===== */
+/* === DATE HELPERS BEGIN === */
+/* Banner is load-bearing: test.js extracts everything between BEGIN/END. */
 
 // Returns 0..6 for Mon..Sun, normalising JS's Sun=0 quirk
 function dowMon0(date) {
@@ -686,12 +689,13 @@ function formatTabName(date, fmt) {
   const mm = pad2(date.getMonth() + 1);
   const mmm = MONTH_SHORT[date.getMonth()];
   switch (fmt) {
+    case 'D':      return String(date.getDate());
     case 'DD-MMM': return `${dd}-${mmm}`;
     case 'DD MMM': return `${dd} ${mmm}`;
     case 'DD-MM':  return `${dd}-${mm}`;
     case 'MMM DD': return `${mmm} ${dd}`;
     case 'Day DD': return `Day ${dd}`;
-    default: return `${dd}-${mmm}`;
+    default:       return String(date.getDate());
   }
 }
 
@@ -702,6 +706,7 @@ function formatLongDate(date) {
 function safeFilename(s) {
   return s.replace(/[\\/:*?"<>|]+/g, '_').trim();
 }
+/* === DATE HELPERS END === */
 
 /* ===== File picking ===== */
 
@@ -719,10 +724,17 @@ async function pickFolder() {
   STATE.dirHandle = dirHandle;
   STATE.masters = [];
 
+  const lockedMasters = [];
   for await (const [name, handle] of dirHandle.entries()) {
     if (handle.kind !== 'file') continue;
     if (!/\.xlsx$/i.test(name)) continue;
-    if (name.startsWith('~$') || name.startsWith('.')) continue;
+    if (name.startsWith('.')) continue;
+    if (name.startsWith('~$')) {
+      // Excel lock file — note which master it's locking, then skip.
+      const m = name.replace(/^~\$/, '');
+      if (m) lockedMasters.push(m);
+      continue;
+    }
     try {
       const file = await handle.getFile();
       await registerMaster(name, file, handle);
@@ -730,6 +742,10 @@ async function pickFolder() {
       console.error('skip', name, e);
       toast(`Skipped ${name}: ${e.message}`, 'err');
     }
+  }
+
+  if (lockedMasters.length) {
+    toast(`Excel has ${lockedMasters.length === 1 ? 'a master' : lockedMasters.length + ' masters'} open — close to avoid save conflicts`, 'err');
   }
 
   finishLoad();
@@ -774,6 +790,7 @@ async function registerMaster(name, file, fileHandle) {
       fileHandle,
       workbook: wb,
       templateSheet: ws,
+      rawBuf: buf,           // surgical-clone generator reads bytes directly
       days,
     });
   } catch (e) {
@@ -930,110 +947,28 @@ function updateGenSummary() {
   $('#btn-generate').disabled = totalSheets === 0;
 }
 
-/* ===== Workbook generation ===== */
+/* === SURGICAL CLONE BEGIN === */
+/* Banner is load-bearing: test.js extracts everything between BEGIN/END
+   and runs it under vm.runInContext with a shimmed DOM. Keep this block
+   self-contained — only globals it depends on are JSZip, DOMParser,
+   XMLSerializer, MONTH_LONG, DAY_LONG, dowMon0, pad2, and formatTabName.
 
-function copyColumns(srcWs, destWs) {
-  if (srcWs.columns) {
-    srcWs.columns.forEach((col, i) => {
-      const destCol = destWs.getColumn(i + 1);
-      if (col.width) destCol.width = col.width;
-      if (col.hidden) destCol.hidden = col.hidden;
-      if (col.style) destCol.style = JSON.parse(JSON.stringify(col.style));
-    });
-  }
-}
+   Why this exists: ExcelJS's read→write round-trip mangles shared formulas
+   (drops t="shared" follower attributes, mis-escapes embedded quotes, leaves
+   xl/calcChain.xml inconsistent with the new sheet layout). Excel reacts
+   with "We found a problem with some content" and reopens the file as
+   [Repaired] [Read-Only]. The fix is to never re-serialize the workbook —
+   we clone the template sheet at the zip-XML level and only rewrite the
+   parts that *must* change (the sheets list, the relationships, content
+   types, and the placeholder cells in each cloned sheet).
 
-function buildMergedNonAnchorSet(srcWs) {
-  // OOXML rejects <c> elements inside a merge range for cells other than
-  // the top-left anchor — Excel flags the workbook as needing recovery.
-  const set = new Set();
-  if (!srcWs.model || !Array.isArray(srcWs.model.merges)) return set;
-  const colToNum = (letters) => {
-    let n = 0;
-    for (let i = 0; i < letters.length; i++) {
-      n = n * 26 + (letters.charCodeAt(i) - 64);
-    }
-    return n;
-  };
-  for (const range of srcWs.model.merges) {
-    const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(String(range).toUpperCase());
-    if (!m) continue;
-    const c1 = colToNum(m[1]), r1 = parseInt(m[2], 10);
-    const c2 = colToNum(m[3]), r2 = parseInt(m[4], 10);
-    const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
-    const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
-    for (let r = minR; r <= maxR; r++) {
-      for (let c = minC; c <= maxC; c++) {
-        if (r === minR && c === minC) continue;
-        set.add(c + ',' + r);
-      }
-    }
-  }
-  return set;
-}
+   Known limitations:
+   - Cell comments aren't supported: if the template sheet has a comments
+     part, cloning the sheet rels would make multiple sheets own the same
+     comments part and Excel would merge them visually onto one. Reef Desk
+     masters don't use cell comments. */
 
-function copyRows(srcWs, destWs, dateContext) {
-  const suppressed = buildMergedNonAnchorSet(srcWs);
-  srcWs.eachRow({ includeEmpty: true }, (row, rowNum) => {
-    const destRow = destWs.getRow(rowNum);
-    if (row.height) destRow.height = row.height;
-    if (row.hidden) destRow.hidden = row.hidden;
-    row.eachCell((cell, colNum) => {
-      if (suppressed.has(colNum + ',' + rowNum)) return;
-      const destCell = destRow.getCell(colNum);
-      let val = cell.value;
-      if (val && typeof val === 'object' && val.formula) {
-        // Preserve formula
-        destCell.value = { formula: val.formula, result: val.result };
-      } else if (typeof val === 'string') {
-        destCell.value = applyDatePlaceholders(val, dateContext);
-      } else if (val && typeof val === 'object' && Array.isArray(val.richText)) {
-        // Rich text — reassemble with substitutions
-        const newRich = val.richText.map(part => ({
-          ...part,
-          text: applyDatePlaceholders(part.text || '', dateContext),
-        }));
-        destCell.value = { richText: newRich };
-      } else {
-        destCell.value = val;
-      }
-      if (cell.style && Object.keys(cell.style).length) {
-        destCell.style = JSON.parse(JSON.stringify(cell.style));
-      }
-      if (cell.numFmt) destCell.numFmt = cell.numFmt;
-    });
-    destRow.commit();
-  });
-}
-
-function copyMerges(srcWs, destWs) {
-  if (srcWs.model && Array.isArray(srcWs.model.merges)) {
-    for (const m of srcWs.model.merges) {
-      try { destWs.mergeCells(m); } catch (e) { /* ignore overlapping */ }
-    }
-  }
-}
-
-function copySheetViewsAndSetup(srcWs, destWs) {
-  if (srcWs.views && srcWs.views.length) {
-    destWs.views = JSON.parse(JSON.stringify(srcWs.views));
-  }
-  if (srcWs.pageSetup) {
-    destWs.pageSetup = JSON.parse(JSON.stringify(srcWs.pageSetup));
-  }
-}
-
-/**
- * Copy a worksheet's content/formatting into a new worksheet.
- * Preserves cell values, formulas, styles, merges, column widths, row heights.
- * Replaces date placeholders in cell strings.
- */
-function copyTemplateSheet(srcWs, destWs, dateContext) {
-  copyColumns(srcWs, destWs);
-  copyRows(srcWs, destWs, dateContext);
-  copyMerges(srcWs, destWs);
-  copySheetViewsAndSetup(srcWs, destWs);
-}
+const PLACEHOLDER_RE = /(\{\{\s*\w+\s*\}\}|\{DATE\}|<DATE>)/i;
 
 function applyDatePlaceholders(s, ctx) {
   if (!s || typeof s !== 'string') return s;
@@ -1047,6 +982,266 @@ function applyDatePlaceholders(s, ctx) {
     .replace(/\{\{\s*dayofweek\s*\}\}/gi, ctx.dow)
     .replace(/\{DATE\}/g, ctx.long)
     .replace(/<DATE>/gi, ctx.long);
+}
+
+function buildDateContext(date, format) {
+  return {
+    long: `${date.getDate()} ${MONTH_LONG[date.getMonth()]} ${date.getFullYear()}`,
+    short: `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`,
+    tab: formatTabName(date, format),
+    day: date.getDate(),
+    monthName: MONTH_LONG[date.getMonth()],
+    year: date.getFullYear(),
+    dow: DAY_LONG[dowMon0(date)],
+  };
+}
+
+function xmlEscape(s) {
+  // For text-node content. Order matters: & first.
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r/g, '&#13;');
+}
+
+function parseXml(xmlString) {
+  return new DOMParser().parseFromString(xmlString, 'application/xml');
+}
+
+function serializeXml(doc) {
+  return new XMLSerializer().serializeToString(doc);
+}
+
+const META_SHEET_NAMES = new Set(['_BookingMeta', '_SheetMeta']);
+
+function findFirstSheetTarget(workbookDoc, relsDoc) {
+  const sheets = workbookDoc.getElementsByTagName('sheet');
+  if (!sheets.length) throw new Error('workbook.xml has no <sheet>');
+  // Pick the first user-visible, non-meta sheet.
+  let chosenRid = null;
+  for (let i = 0; i < sheets.length; i++) {
+    const el = sheets[i];
+    const name = el.getAttribute('name') || '';
+    const state = el.getAttribute('state') || '';
+    if (META_SHEET_NAMES.has(name)) continue;
+    if (state === 'hidden' || state === 'veryHidden') continue;
+    chosenRid = el.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')
+              || el.getAttribute('r:id');
+    break;
+  }
+  if (!chosenRid) {
+    // Fall back to the very first sheet if every sheet was filtered out.
+    chosenRid = sheets[0].getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')
+             || sheets[0].getAttribute('r:id');
+  }
+  // Resolve the rId to a part path.
+  const rels = relsDoc.getElementsByTagName('Relationship');
+  let target = null;
+  for (let i = 0; i < rels.length; i++) {
+    if (rels[i].getAttribute('Id') === chosenRid) {
+      target = rels[i].getAttribute('Target');
+      break;
+    }
+  }
+  if (!target) throw new Error(`workbook rels missing entry for ${chosenRid}`);
+  // Targets in workbook.xml.rels are relative to xl/, so prefix.
+  const sheetPath = target.startsWith('/') ? target.slice(1) : ('xl/' + target.replace(/^\.\//, ''));
+  // Sheet rels live next to the sheet: xl/worksheets/_rels/sheetN.xml.rels
+  const m = /^(.*\/)([^/]+)$/.exec(sheetPath);
+  const sheetRelsPath = m ? (m[1] + '_rels/' + m[2] + '.rels') : null;
+  return { sheetPath, sheetRelsPath, oldRid: chosenRid };
+}
+
+function collectSiText(siEl) {
+  // Concatenate all <t> descendants (handles both <si><t> and <si><r><t> runs).
+  const parts = [];
+  const ts = siEl.getElementsByTagName('t');
+  for (let i = 0; i < ts.length; i++) parts.push(ts[i].textContent || '');
+  return parts.join('');
+}
+
+function buildPlaceholderSiIndex(sharedStringsDoc) {
+  const map = new Map();
+  if (!sharedStringsDoc) return map;
+  const sis = sharedStringsDoc.getElementsByTagName('si');
+  for (let i = 0; i < sis.length; i++) {
+    const text = collectSiText(sis[i]);
+    if (PLACEHOLDER_RE.test(text)) map.set(i, text);
+  }
+  return map;
+}
+
+function cloneSheetXml(templateXmlString, siMap, ctx) {
+  const doc = parseXml(templateXmlString);
+  const cells = doc.getElementsByTagName('c');
+  // Collect then mutate to avoid live-NodeList surprises.
+  const toMutate = [];
+  for (let i = 0; i < cells.length; i++) toMutate.push(cells[i]);
+
+  for (const c of toMutate) {
+    const t = c.getAttribute('t');
+    if (t === 's') {
+      const vEl = c.getElementsByTagName('v')[0];
+      if (!vEl) continue;
+      const idx = parseInt(vEl.textContent || '', 10);
+      if (!siMap.has(idx)) continue;
+      const original = siMap.get(idx);
+      const substituted = applyDatePlaceholders(original, ctx);
+      // Convert <c t="s"><v>idx</v></c> → <c t="inlineStr"><is><t xml:space="preserve">…</t></is></c>
+      c.removeChild(vEl);
+      c.setAttribute('t', 'inlineStr');
+      const is = doc.createElement('is');
+      const tEl = doc.createElement('t');
+      tEl.setAttribute('xml:space', 'preserve');
+      tEl.appendChild(doc.createTextNode(substituted));
+      is.appendChild(tEl);
+      c.appendChild(is);
+    } else if (t === 'str') {
+      const vEl = c.getElementsByTagName('v')[0];
+      if (!vEl) continue;
+      const txt = vEl.textContent || '';
+      if (!PLACEHOLDER_RE.test(txt)) continue;
+      vEl.textContent = applyDatePlaceholders(txt, ctx);
+    } else if (t === 'inlineStr') {
+      const isEl = c.getElementsByTagName('is')[0];
+      if (!isEl) continue;
+      const ts = isEl.getElementsByTagName('t');
+      for (let i = 0; i < ts.length; i++) {
+        const txt = ts[i].textContent || '';
+        if (PLACEHOLDER_RE.test(txt)) ts[i].textContent = applyDatePlaceholders(txt, ctx);
+      }
+    }
+    // Formulas, numbers, booleans, errors: untouched.
+  }
+  return serializeXml(doc);
+}
+
+function rewriteWorkbookSheets(workbookXmlString, sheetSpecs) {
+  // Regex-replace only the <sheets>…</sheets> block. xmlns:r is declared
+  // once on <workbook> and remains in scope, so we can emit r:id without
+  // redeclaring it. We deliberately avoid DOMParser/XMLSerializer here
+  // because the surrounding workbook part has long-lived <definedNames>,
+  // <bookViews>, <calcPr>, <fileVersion>, etc., and we want byte-stability.
+  const block = sheetSpecs
+    .map(s => `<sheet name="${xmlEscape(s.name)}" sheetId="${s.sheetId}" r:id="${s.rId}"/>`)
+    .join('');
+  const re = /<sheets\b[^>]*>[\s\S]*?<\/sheets>/;
+  if (!re.test(workbookXmlString)) {
+    // Fallback: some workbooks emit <sheets/> shorthand.
+    const reShort = /<sheets\s*\/>/;
+    if (reShort.test(workbookXmlString)) {
+      return workbookXmlString.replace(reShort, `<sheets>${block}</sheets>`);
+    }
+    throw new Error('workbook.xml has no <sheets> block');
+  }
+  return workbookXmlString.replace(re, `<sheets>${block}</sheets>`);
+}
+
+const REL_TYPE_WORKSHEET  = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet';
+const REL_TYPE_CALCCHAIN  = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain';
+const CT_WORKSHEET = 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
+const CT_CALCCHAIN = 'application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml';
+
+function rewriteWorkbookRels(relsXmlString, sheetSpecs) {
+  const doc = parseXml(relsXmlString);
+  const rels = doc.getElementsByTagName('Relationship');
+  const toRemove = [];
+  for (let i = 0; i < rels.length; i++) {
+    const type = rels[i].getAttribute('Type') || '';
+    if (type === REL_TYPE_WORKSHEET || type === REL_TYPE_CALCCHAIN) toRemove.push(rels[i]);
+  }
+  for (const r of toRemove) r.parentNode.removeChild(r);
+  const root = doc.documentElement;
+  for (const s of sheetSpecs) {
+    const r = doc.createElement('Relationship');
+    r.setAttribute('Id', s.rId);
+    r.setAttribute('Type', REL_TYPE_WORKSHEET);
+    r.setAttribute('Target', `worksheets/sheet${s.sheetId}.xml`);
+    root.appendChild(r);
+  }
+  return serializeXml(doc);
+}
+
+function rewriteContentTypes(ctXmlString, sheetCount) {
+  const doc = parseXml(ctXmlString);
+  const overrides = doc.getElementsByTagName('Override');
+  const toRemove = [];
+  for (let i = 0; i < overrides.length; i++) {
+    const ct = overrides[i].getAttribute('ContentType') || '';
+    if (ct === CT_WORKSHEET || ct === CT_CALCCHAIN) toRemove.push(overrides[i]);
+  }
+  for (const o of toRemove) o.parentNode.removeChild(o);
+  const root = doc.documentElement;
+  for (let i = 1; i <= sheetCount; i++) {
+    const o = doc.createElement('Override');
+    o.setAttribute('PartName', `/xl/worksheets/sheet${i}.xml`);
+    o.setAttribute('ContentType', CT_WORKSHEET);
+    root.appendChild(o);
+  }
+  return serializeXml(doc);
+}
+
+async function generateSurgicalWorkbook(master, dates, format) {
+  const zip = await JSZip.loadAsync(master.rawBuf);
+
+  const readPart = async (path) => {
+    const f = zip.file(path);
+    return f ? await f.async('string') : null;
+  };
+
+  const ctXml       = await readPart('[Content_Types].xml');
+  const workbookXml = await readPart('xl/workbook.xml');
+  const wbRelsXml   = await readPart('xl/_rels/workbook.xml.rels');
+  const sharedXml   = await readPart('xl/sharedStrings.xml');
+
+  if (!ctXml || !workbookXml || !wbRelsXml) {
+    throw new Error('not a valid xlsx (missing required parts)');
+  }
+
+  const workbookDoc = parseXml(workbookXml);
+  const wbRelsDoc   = parseXml(wbRelsXml);
+  const sharedDoc   = sharedXml ? parseXml(sharedXml) : null;
+
+  const { sheetPath, sheetRelsPath } = findFirstSheetTarget(workbookDoc, wbRelsDoc);
+  const templateXml     = await readPart(sheetPath);
+  const templateRelsXml = sheetRelsPath ? await readPart(sheetRelsPath) : null;
+  if (!templateXml) throw new Error(`template sheet missing: ${sheetPath}`);
+
+  const siMap = buildPlaceholderSiIndex(sharedDoc);
+
+  // Sweep existing worksheet entries — we'll write fresh sheet1..N.xml.
+  const existingSheetFiles = Object.keys(zip.files).filter(p =>
+    /^xl\/worksheets\/sheet\d+\.xml$/.test(p) ||
+    /^xl\/worksheets\/_rels\/sheet\d+\.xml\.rels$/.test(p)
+  );
+  for (const p of existingSheetFiles) zip.remove(p);
+
+  const sheetSpecs = [];
+  for (let i = 0; i < dates.length; i++) {
+    const sheetId = i + 1;
+    const dt = dates[i];
+    const ctx = buildDateContext(dt, format);
+    const newXml = cloneSheetXml(templateXml, siMap, ctx);
+    zip.file(`xl/worksheets/sheet${sheetId}.xml`, newXml);
+    if (templateRelsXml) {
+      zip.file(`xl/worksheets/_rels/sheet${sheetId}.xml.rels`, templateRelsXml);
+    }
+    // Excel sheet name limits: max 31 chars, no \\ / ? * [ ] :
+    const safeName = ctx.tab.replace(/[\\/?*\[\]:]/g, '_').slice(0, 31);
+    sheetSpecs.push({ name: safeName, sheetId, rId: `rIdSheet${sheetId}` });
+  }
+
+  // calcChain must go — Excel will regenerate it on first open. Leaving a
+  // stale one alongside our rewritten sheets is exactly what triggered the
+  // "Removed Records: Formula from /xl/worksheets/sheetN.xml" dialog in v1.
+  zip.remove('xl/calcChain.xml');
+
+  zip.file('xl/workbook.xml',          rewriteWorkbookSheets(workbookXml, sheetSpecs));
+  zip.file('xl/_rels/workbook.xml.rels', rewriteWorkbookRels(wbRelsXml, sheetSpecs));
+  zip.file('[Content_Types].xml',      rewriteContentTypes(ctXml, sheetSpecs.length));
+
+  return await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
 }
 
 async function setupOutputDirectory(monthLabel) {
@@ -1063,31 +1258,7 @@ async function setupOutputDirectory(monthLabel) {
   }
   return null;
 }
-
-function generateWorkbookForMaster(m, dates) {
-  const outWb = new ExcelJS.Workbook();
-  outWb.creator = 'Sheet Shaper';
-  outWb.created = new Date();
-
-  for (const dt of dates) {
-    const tabName = formatTabName(dt, STATE.format);
-    const ctx = {
-      long: formatLongDate(dt),
-      short: `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}`,
-      tab: tabName,
-      day: dt.getDate(),
-      monthName: MONTH_LONG[dt.getMonth()],
-      year: dt.getFullYear(),
-      dow: DAY_LONG[dowMon0(dt)],
-    };
-    // Excel sheet names: max 31 chars, no \\ / ? * [ ]
-    let safeName = tabName.replace(/[\\/?*\[\]:]/g, '_').slice(0, 31);
-    const ws = outWb.addWorksheet(safeName);
-    copyTemplateSheet(m.templateSheet, ws, ctx);
-  }
-
-  return outWb;
-}
+/* === SURGICAL CLONE END === */
 
 async function handleDownload(buf, outName, outDir) {
   if (outDir) {
@@ -1125,9 +1296,8 @@ async function generateAll() {
     }
 
     try {
-      const outWb = generateWorkbookForMaster(m, dates);
+      const buf = await generateSurgicalWorkbook(m, dates, STATE.format);
       const outName = safeFilename(`${m.excursionName} — ${monthLabel}.xlsx`);
-      const buf = await outWb.xlsx.writeBuffer();
 
       await handleDownload(buf, outName, outDir);
 
