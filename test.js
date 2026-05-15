@@ -489,6 +489,7 @@ function loadBoatHelpers() {
   const boatInfer = extractBlock(html, /\/\* === BOAT_INFER_BEGIN === \*\//, /\/\* === BOAT_INFER_END === \*\//);
   const ensureCap = extractBlock(html, /\/\* === ENSURE_CAPACITY_BEGIN === \*\//, /\/\* === ENSURE_CAPACITY_END === \*\//);
   const rebuild   = extractBlock(html, /\/\* === REBUILD_GROUPINGS_BEGIN === \*\//, /\/\* === REBUILD_GROUPINGS_END === \*\//);
+  const bulk      = extractBlock(html, /\/\* === BULK_ASSIGN_BEGIN === \*\//, /\/\* === BULK_ASSIGN_END === \*\//);
 
   // Stubs for v5 helpers the extracted code calls. Kept minimal — these
   // are tiny utilities; their browser-side definitions are not under test.
@@ -557,6 +558,11 @@ function loadBoatHelpers() {
       const existing = fileEntry.sheetMeta.get(sheetName) || {};
       fileEntry.sheetMeta.set(sheetName, Object.assign({}, existing, partial));
       fileEntry.dirty = true;
+      if (!fileEntry.pendingOps) fileEntry.pendingOps = [];
+      fileEntry.pendingOps.push({ kind: 'setSheetMeta', sheetName, fields: partial });
+    }
+    function _setBoatsAndAssignments(fileEntry, sheetName, boats, assignments) {
+      setSheetMeta(fileEntry, sheetName, { boats, assignments });
     }
     function isMultiBoatFile(fileEntry) { return fileEntry && fileEntry.__multiBoat === true; }
     function rebuildBookings() {}
@@ -572,10 +578,11 @@ function loadBoatHelpers() {
 
   const sandbox = { console };
   vm.createContext(sandbox);
-  vm.runInContext(stubs + '\n' + boatInfer + '\n' + ensureCap + '\n' + rebuild + '\n', sandbox, { filename: 'engine-extracted.js' });
+  vm.runInContext(stubs + '\n' + boatInfer + '\n' + ensureCap + '\n' + rebuild + '\n' + bulk + '\n', sandbox, { filename: 'engine-extracted.js' });
   if (typeof sandbox.inferBoatsFromSheet !== 'function') throw new Error('inferBoatsFromSheet missing');
   if (typeof sandbox.ensureCapacity !== 'function') throw new Error('ensureCapacity missing');
   if (typeof sandbox.rebuildBoatGroupings !== 'function') throw new Error('rebuildBoatGroupings missing');
+  if (typeof sandbox.bulkAssignToBoat !== 'function') throw new Error('bulkAssignToBoat missing');
   return sandbox;
 }
 
@@ -770,6 +777,69 @@ async function testRebuildBoatGroupings(ctx) {
   console.log('  · rebuildBoatGroupings emits ordered separators + deterministic across runs');
 }
 
+async function testBulkAssign(ctx) {
+  // 3 boats, 6 bookings — all start unassigned. Bulk-assign 3 onto BOAT 1,
+  // then the other 3 onto BOAT 2, then unassign one — assert the
+  // resulting assignment map and the op-log shape.
+  const sheetMeta = new Map();
+  sheetMeta.set('01', {
+    boats: [
+      { id: 'b-1', name: 'SHADHA', capacity: 10 },
+      { id: 'b-2', name: 'BAAZ',   capacity: 10 },
+      { id: 'b-3', name: 'FALHU',  capacity: 10 },
+    ],
+    assignments: {},
+  });
+  const file = {
+    name: '01 - Sunset Dolphin Cruise May.xlsx',
+    sheets: [{ sheetName: '01' }],
+    sheetMeta,
+    __multiBoat: true,
+    dirty: false,
+    pendingOps: [],
+  };
+  const keysA = ['101|Alice|2026-05-10','102|Bob|2026-05-10','103|Cara|2026-05-10'];
+  const keysB = ['201|Dan|2026-05-10','202|Eve|2026-05-10','203|Fay|2026-05-10'];
+
+  const changed1 = ctx.bulkAssignToBoat(file, '01', keysA, 'b-1');
+  assert.strictEqual(changed1, 3, `first bulk should change 3, got ${changed1}`);
+  const changed2 = ctx.bulkAssignToBoat(file, '01', keysB, 'b-2');
+  assert.strictEqual(changed2, 3, `second bulk should change 3, got ${changed2}`);
+
+  let cur = sheetMeta.get('01');
+  for (const k of keysA) assert.strictEqual(cur.assignments[k], 'b-1', `${k} should be on b-1`);
+  for (const k of keysB) assert.strictEqual(cur.assignments[k], 'b-2', `${k} should be on b-2`);
+
+  // Exactly two setSheetMeta ops should have been recorded.
+  assert.strictEqual(file.pendingOps.length, 2,
+    `expected 2 setSheetMeta ops, got ${file.pendingOps.length}`);
+  for (const op of file.pendingOps) {
+    assert.strictEqual(op.kind, 'setSheetMeta');
+    assert.ok(op.fields && op.fields.assignments && op.fields.boats,
+      'each op should carry both boats and assignments');
+  }
+
+  // Unassign two of them in one call (boatId=null).
+  const changed3 = ctx.bulkAssignToBoat(file, '01', [keysA[0], keysA[1]], null);
+  assert.strictEqual(changed3, 2, `unassign of 2 keys should change 2, got ${changed3}`);
+  cur = sheetMeta.get('01');
+  assert.ok(!(keysA[0] in cur.assignments), `${keysA[0]} should be unassigned`);
+  assert.ok(!(keysA[1] in cur.assignments), `${keysA[1]} should be unassigned`);
+  assert.strictEqual(cur.assignments[keysA[2]], 'b-1', `${keysA[2]} should still be on b-1`);
+
+  // Re-applying the same boatId is a no-op (returns 0, no new op recorded).
+  const before = file.pendingOps.length;
+  const changed4 = ctx.bulkAssignToBoat(file, '01', [keysB[0]], 'b-2');
+  assert.strictEqual(changed4, 0, 'reapplying same boat should be a no-op');
+  assert.strictEqual(file.pendingOps.length, before, 'no-op must not push a new op');
+
+  // Unknown boatId throws — guards against dangling assignments slipping through.
+  assert.throws(() => ctx.bulkAssignToBoat(file, '01', [keysB[0]], 'b-nope'),
+    /unknown boatId/, 'unknown boatId should throw');
+
+  console.log('  · bulkAssignToBoat batches, no-ops cleanly, rejects unknown boatId');
+}
+
 async function runMultiBoatTests() {
   console.log('\n=== Multi-boat helpers ===');
   console.log('A. Extracting boat helpers from Booking engine v5.html');
@@ -785,6 +855,8 @@ async function runMultiBoatTests() {
   await testValidateAssignments(ctx);
   console.log('E. rebuildBoatGroupings groups rows + deterministic');
   await testRebuildBoatGroupings(ctx);
+  console.log('F. bulkAssignToBoat batches multi-row moves in one op');
+  await testBulkAssign(ctx);
   console.log('  All multi-boat assertions passed.');
 }
 
