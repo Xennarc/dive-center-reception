@@ -259,10 +259,10 @@ border-radius: 999px; background: var(--card);
 border: 1px solid var(--border-strong); color: var(--ink-2);
 }
 .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
-.<status-pill.is>-dirty {
+.status-pill.is-dirty {
 color: var(--warn); border-color: var(--warn); background: var(--warn-soft);
 }
-.<status-pill.is>-dirty .dot { background: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
+.status-pill.is-dirty .dot { background: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 
 /* ===== Date strip (sub-header) ===== */
@@ -307,12 +307,20 @@ position: absolute; bottom: 3px;
 width: 4px; height: 4px; border-radius: 50%;
 background: var(--muted-2);
 }
-.<date-pill.is>-today:not(.is-active) { background: var(--card); border-color: var(--border-strong); }
-.<date-pill.is>-today .day { color: var(--primary); }
-.<date-pill.is>-active { background: var(--primary); border-color: var(--primary); }
-.<date-pill.is>-active .dow { color: rgba(255, 255, 255, .82); }
-.<date-pill.is>-active .day { color: white; }
-.<date-pill.is>-active .has-data { background: rgba(255, 255, 255, .85); }
+.date-pill.is-today:not(.is-active) { background: var(--card); border-color: var(--border-strong); }
+.date-pill.is-today .day { color: var(--primary); }
+.date-pill.is-active {
+  background: var(--primary); border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(43, 140, 140, .18), 0 1px 2px rgba(0,0,0,.08);
+  transform: translateY(-1px);
+}
+.date-pill.is-active .dow { color: rgba(255, 255, 255, .82); }
+.date-pill.is-active .day { color: white; }
+.date-pill.is-active .has-data { background: rgba(255, 255, 255, .85); }
+.date-pill.is-complete:not(.is-active) { background: rgba(79, 166, 122, 0.08); }
+.date-pill.is-complete .has-data { background: var(--rd-success); }
+.date-pill.is-cancelled-day:not(.is-active) { background: rgba(196, 83, 60, 0.08); }
+.date-pill.is-cancelled-day .has-data { background: var(--rd-danger); }
 .date-pill.month-divider { padding-left: 18px; }
 .date-pill.month-divider::before {
 content: attr(data-month);
@@ -358,7 +366,7 @@ border: none; background: transparent; cursor: pointer;
 color: var(--muted); padding: 4px; border-radius: 4px;
 display: none;
 }
-.<search-clear.is>-visible { display: flex; }
+.search-clear.is-visible { display: flex; }
 .search-clear:hover { background: rgba(20, 24, 28, .06); color: var(--ink); }
 
 .seg {
@@ -374,7 +382,7 @@ color: var(--ink-2); cursor: pointer;
 transition: all .12s;
 }
 .seg-btn:hover { color: var(--ink); }
-.<seg-btn.is>-active { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.seg-btn.is-active { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 
 /* ===== Day heading ===== */
 .day-heading {
@@ -419,8 +427,8 @@ background: var(--track);
 border-radius: 3px; overflow: hidden;
 }
 .cap-bar-fill { height: 100%; background: var(--exc-color, var(--primary)); transition: width .3s; }
-.<cap-bar-fill.is>-warn { background: var(--warn); }
-.<cap-bar-fill.is>-full { background: var(--bad); }
+.cap-bar-fill.is-warn { background: var(--warn); }
+.cap-bar-fill.is-full { background: var(--bad); }
 
 table.exc-table {
 width: 100%; border-collapse: collapse; font-size: 13px;
@@ -609,8 +617,8 @@ box-shadow: 0 0 0 3px rgba(43, 140, 140, .15);
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .field-help { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 18px; }
-.<field-help.is>-good { color: var(--good); }
-.<field-help.is>-warn { color: var(--bad); }
+.field-help.is-good { color: var(--good); }
+.field-help.is-warn { color: var(--bad); }
 
 .field label .req {
   color: var(--accent);
@@ -625,15 +633,15 @@ box-shadow: 0 0 0 3px rgba(43, 140, 140, .15);
   text-transform: none;
   letter-spacing: 0;
 }
-.<field.is>-error input,
-.<field.is>-error select,
-.<field.is>-error textarea {
+.field.is-error input,
+.field.is-error select,
+.field.is-error textarea {
   border-color: var(--bad);
   background: var(--bad-soft);
 }
-.<field.is>-error input:focus,
-.<field.is>-error select:focus,
-.<field.is>-error textarea:focus {
+.field.is-error input:focus,
+.field.is-error select:focus,
+.field.is-error textarea:focus {
   border-color: var(--bad);
   box-shadow: 0 0 0 3px rgba(196, 83, 60, 0.18);
 }
@@ -655,7 +663,7 @@ box-shadow: 0 0 0 3px rgba(43, 140, 140, .15);
   color: var(--muted);
   margin-top: 8px;
 }
-.<pax-summary.is>-zero { color: var(--bad); }
+.pax-summary.is-zero { color: var(--bad); }
 .modal-legend {
   font-size: 12px;
   color: var(--muted);
@@ -688,8 +696,8 @@ box-shadow: 0 12px 32px rgba(0,0,0,.25);
 animation: toastin .2s cubic-bezier(.2,.8,.2,1.1);
 display: flex; align-items: center; gap: 8px;
 }
-.<toast.is>-error { background: var(--bad); }
-.<toast.is>-success { background: var(--good); }
+.toast.is-error { background: var(--bad); }
+.toast.is-success { background: var(--good); }
 @keyframes toastin { from { transform: translate(-50%, 8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
 /* ===== Stats dashboard ===== */
@@ -836,7 +844,7 @@ font-size: 10px; font-weight: 600;
 padding: 0 5px;
 margin-left: 4px;
 }
-.<btn-badge.is>-stale { background: var(--warn); }
+.btn-badge.is-stale { background: var(--warn); }
 
 .upload-zone {
 border: 2px dashed var(--border-strong);
@@ -850,7 +858,7 @@ background: var(--bg);
 border-color: var(--primary);
 background: var(--primary-soft);
 }
-.<upload-zone.is>-drag {
+.upload-zone.is-drag {
 border-color: var(--primary);
 background: var(--primary-soft);
 border-style: solid;
@@ -919,12 +927,12 @@ font-size: 12px; font-weight: 500;
 }
 .report-row .remove .icon { width: 14px; height: 14px; }
 .report-row .remove:hover { background: var(--bad); color: white; }
-.<report-row.is>-failed { background: var(--bad-soft); border-color: var(--bad); }
-.<report-row.is>-failed .property { background: rgba(168, 49, 63, .18); color: var(--bad); }
-.<report-row.is>-failed .meta { color: var(--bad); }
-.<report-row.is>-warned { background: var(--warn-soft); border-color: var(--warn); }
-.<report-row.is>-warned .property { background: rgba(181, 120, 32, .18); color: var(--warn); }
-.<report-row.is>-warned .meta { color: var(--warn); white-space: normal; }
+.report-row.is-failed { background: var(--bad-soft); border-color: var(--bad); }
+.report-row.is-failed .property { background: rgba(168, 49, 63, .18); color: var(--bad); }
+.report-row.is-failed .meta { color: var(--bad); }
+.report-row.is-warned { background: var(--warn-soft); border-color: var(--warn); }
+.report-row.is-warned .property { background: rgba(181, 120, 32, .18); color: var(--warn); }
+.report-row.is-warned .meta { color: var(--warn); white-space: normal; }
 
 .parse-progress {
 display: flex; align-items: center; gap: 8px;
@@ -940,7 +948,7 @@ animation: spin .6s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.<field-help.is>-info { color: var(--primary); font-weight: 500; }
+.field-help.is-info { color: var(--primary); font-weight: 500; }
 
 @media (max-width: 720px) {
 .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -991,6 +999,20 @@ animation: spin .6s linear infinite;
 .show-cancelled-toggle:hover { color: var(--ink); border-color: var(--border-strong); }
 .show-cancelled-toggle.is-on { background: var(--card); color: var(--ink); border-color: var(--border-strong); }
 
+.filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 14px; }
+.filter-chip {
+  padding: 4px 12px; border-radius: 999px; font-size: 12px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.filter-chip:hover { color: var(--ink); border-color: var(--border-strong); }
+.filter-chip.is-on { background: var(--primary); color: white; border-color: var(--primary); }
+.outstanding-badge {
+  align-self: center;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(224, 163, 60, 0.18); color: var(--rd-warning);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+
 /* Status pills inside the bookings table */
 .col-status { width: 110px; }
 .pill {
@@ -1023,6 +1045,46 @@ animation: spin .6s linear infinite;
 }
 .activity-cancelled-banner .acb-main { flex: 1; min-width: 200px; }
 .activity-cancelled-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Day-complete banner on excursion card */
+.exc-card.is-day-complete { border-color: rgba(79, 166, 122, 0.5); }
+.day-complete-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px;
+  background: rgba(79, 166, 122, 0.12);
+  border-bottom: 1px solid rgba(79, 166, 122, 0.35);
+  color: var(--rd-success); font-size: 13px; flex-wrap: wrap;
+}
+.day-complete-banner .acb-main { flex: 1; min-width: 200px; }
+.day-complete-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Multi-user sync banners on excursion cards */
+.sync-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 12px; font-size: 12px;
+}
+.sync-banner.sync-locked {
+  background: rgba(224, 163, 60, 0.10);
+  border-bottom: 1px solid rgba(224, 163, 60, 0.30);
+  color: var(--rd-warning);
+}
+.sync-banner.sync-remote {
+  background: rgba(43, 140, 140, 0.08);
+  border-bottom: 1px solid rgba(43, 140, 140, 0.30);
+  color: var(--primary);
+}
+.sync-banner.sync-remote strong { color: var(--ink); }
+
+/* Header user identity chip */
+.user-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--border-strong);
+  color: var(--ink); font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: border-color .12s;
+}
+.user-chip:hover { border-color: var(--primary); }
+.user-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
 
 /* Capacity override pencil button + popover */
 .cap-edit-btn {
@@ -1165,6 +1227,9 @@ animation: spin .6s linear infinite;
     </button>
     <div class="spacer"></div>
     <div id="status-area" style="display:none; gap: 6px; align-items:center;">
+      <button id="user-chip" class="user-chip" title="Click to change">
+        <span class="user-chip-dot"></span><span id="user-chip-name">—</span>
+      </button>
       <span id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">Ready</span></span>
       <span id="saving-indicator" class="saving-indicator" title="A save is in progress — closing now risks corrupting the file">
         <span class="spinner"></span><span>Saving — please don't close</span>
@@ -1225,6 +1290,7 @@ animation: spin .6s linear infinite;
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
+      <span id="outstanding-badge" class="outstanding-badge" style="display:none" title="Active bookings on the selected date that are unpaid or marked no-show"></span>
       <div class="spacer" style="flex:1"></div>
       <button id="btn-inhouse" class="btn btn-with-badge" title="Manage inhouse reports">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
@@ -1284,6 +1350,8 @@ const STATE = {
   search: '',
   selectedDate: null,        // ISO
   showCancelled: false,      // toggle: include cancelled/postponed in agenda lists
+  searchFilter: 'all',       // status filter chip on search results (session-only)
+  agendaFilter: 'all',       // status filter chip on agenda cards (session-only)
   inhouseGuests: [],         // [{room, name, arrival, departure, property, businessDate, sourceFile}]
   inhouseReports: [],        // [{filename, property, businessDate, guestCount, error?}]
   userId: null,              // operator name; persisted at localStorage['reefdesk:userId']
@@ -1831,7 +1899,7 @@ const META_SHEET_SHEET   = '_SheetMeta';
 const META_SHEET_NAMES   = [META_BOOKING_SHEET, META_SHEET_SHEET];
 
 const BOOKING_META_COLS = ['sheetName','rowIdx','status','cancelReason','cancelledAt','postponedTo','postponedRef','attended','paid','paidAt'];
-const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity','boats','assignments'];
+const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity','completed','completedAt','completedBy','boats','assignments'];
 // JSON-serialised fields. Empty array / object collapses to empty cell.
 const SHEET_META_JSON_COLS = new Set(['boats','assignments']);
 
@@ -1843,6 +1911,7 @@ const BOOKING_META_DEFAULTS = {
 const SHEET_META_DEFAULTS = {
   activityCancelled: false, cancelReasonCat: '', cancelReasonNote: '',
   guestsInformed: false, cancelledAt: '', customCapacity: null,
+  completed: false, completedAt: '', completedBy: '',
   boats: [], assignments: {},
 };
 
@@ -1901,7 +1970,7 @@ function readMetaSheets(wb) {
         if (col === 'sheetName' || headers[col] == null) continue;
         const v = cellRaw(row.getCell(headers[col]));
         if (v == null || v === '') continue;
-        if (col === 'activityCancelled' || col === 'guestsInformed') obj[col] = asBool(v);
+        if (col === 'activityCancelled' || col === 'guestsInformed' || col === 'completed') obj[col] = asBool(v);
         else if (col === 'customCapacity') { const n = Number(v); obj[col] = isNaN(n) ? null : n; }
         else if (SHEET_META_JSON_COLS.has(col)) {
           try { obj[col] = JSON.parse(String(v)); }
@@ -3587,7 +3656,31 @@ async function pollExternalChanges() {
       dirtyRemoteSeen = true;
     }
   }
-  if (anyReloaded) {
+
+  // Scan peer locks so the UI can show who else is editing.
+  let lockChanged = false;
+  const peerLocks = new Map();
+  try {
+    for await (const [name, h] of STATE.dirHandle.entries()) {
+      const m = /^~\$(.+)\.savelock\.(.+)$/.exec(name);
+      if (!m) continue;
+      if (m[2] === SESSION_ID) continue;
+      try {
+        const body = JSON.parse(await (await h.getFile()).text());
+        if (body && body.userId) peerLocks.set(m[1], body);
+      } catch (_) {}
+    }
+  } catch (_) {}
+  for (const f of STATE.files) {
+    const next = peerLocks.get(f.name) || null;
+    const prev = f.lockedBy || null;
+    const sameUser = (next && prev && next.userId === prev.userId);
+    const bothNull = (!next && !prev);
+    if (!sameUser && !bothNull) lockChanged = true;
+    f.lockedBy = next;
+  }
+
+  if (anyReloaded || lockChanged) {
     renderView();
     renderDateStrip();
     updateStatus();
@@ -3613,6 +3706,12 @@ function loadUserId() {
     const v = localStorage.getItem('reefdesk:userId');
     if (v) STATE.userId = v;
   } catch (_) {}
+  updateUserChip();
+}
+
+function updateUserChip() {
+  const node = document.getElementById('user-chip-name');
+  if (node) node.textContent = STATE.userId || '—';
 }
 
 function promptForUserId() {
@@ -3623,6 +3722,7 @@ function promptForUserId() {
       if (!v) { input.focus(); return; }
       try { localStorage.setItem('reefdesk:userId', v); } catch (_) {}
       STATE.userId = v;
+      updateUserChip();
       closeModal();
       resolve(v);
     };
@@ -3821,6 +3921,20 @@ function updateStatus(){
     txt.textContent = `${STATE.files.length} file${STATE.files.length>1?'s':''}`;
   }
   $('#btn-save').disabled = !dirty;
+  updateOutstandingBadge();
+}
+
+function updateOutstandingBadge() {
+  const node = $('#outstanding-badge');
+  if (!node) return;
+  const d = STATE.selectedDate;
+  if (!d) { node.style.display = 'none'; return; }
+  const day = STATE.bookings.filter(b => b.dateISO === d && (b.status === 'active' || !b.status));
+  const unpaid = day.filter(b => b.paid !== 'yes' && b.paid !== 'comp').length;
+  const noshow = day.filter(b => b.attended === 'no').length;
+  if (!unpaid && !noshow) { node.style.display = 'none'; return; }
+  node.textContent = `${unpaid} unpaid · ${noshow} no-show`;
+  node.style.display = '';
 }
 
 function updateSavingIndicator(){
@@ -3852,6 +3966,16 @@ function renderDateStrip() {
     const isActive = d === STATE.selectedDate;
     const isToday = d === today;
 
+    // Day-level rollup: complete only if every non-cancelled sheet for this date is marked completed.
+    // is-cancelled-day wins over is-complete in the precedence rule.
+    const sheetsForDate = [];
+    for (const f of STATE.files) for (const s of f.sheets) {
+      if (s.layout.dateISO === d) sheetsForDate.push({f, s});
+    }
+    const activeSheets = sheetsForDate.filter(({f, s}) => !getSheetMeta(f, s.sheetName).activityCancelled);
+    const isComplete = activeSheets.length > 0 && activeSheets.every(({f, s}) => getSheetMeta(f, s.sheetName).completed);
+    const isAllCancelled = sheetsForDate.length > 0 && sheetsForDate.every(({f, s}) => getSheetMeta(f, s.sheetName).activityCancelled);
+
     const [Y,M,D] = d.split('-').map(Number);
     const dt = new Date(Y, M-1, D);
     const dow = dt.toLocaleDateString(undefined, {weekday:'short'}).slice(0,3);
@@ -3860,6 +3984,7 @@ function renderDateStrip() {
       class: 'date-pill' +
         (isActive ? ' is-active' : '') +
         (isToday ? ' is-today' : '') +
+        (isAllCancelled ? ' is-cancelled-day' : (isComplete ? ' is-complete' : '')) +
         (isMonthStart ? ' month-divider' : ''),
       'data-date': d,
       ...(isMonthStart ? {'data-month': fmtMonth(d)} : {}),
@@ -3884,6 +4009,7 @@ function renderDateStrip() {
 function renderView() {
   const c = $('#view-container');
   c.innerHTML = '';
+  updateOutstandingBadge();
   // Search overrides everything
   if (STATE.search.trim()) { c.append(renderSearchResults()); return; }
   if (STATE.view === 'people') { c.append(renderPeople()); return; }
@@ -3966,6 +4092,8 @@ function renderAgenda() {
     return wrap;
   }
 
+  wrap.append(renderStatusFilterChips('agendaFilter', () => renderView()));
+
   const agenda = el('div', {class:'agenda'});
   for (const {file, sheet} of sheets) {
     agenda.append(renderExcursionCard(file, sheet));
@@ -3989,7 +4117,12 @@ function renderExcursionCard(file, sheet) {
   const pct = cap ? Math.min(100, (filled/cap)*100) : 0;
   const status = filled >= cap ? 'is-full' : (cap && filled >= cap * 0.85) ? 'is-warn' : '';
 
-  const card = el('div', {class: 'exc-card' + (sheetMeta.activityCancelled ? ' is-day-cancelled' : ''), style: {'--exc-color': file.excursionColor}});
+  const card = el('div', {
+    class: 'exc-card'
+      + (sheetMeta.activityCancelled ? ' is-day-cancelled' : '')
+      + (sheetMeta.completed ? ' is-day-complete' : ''),
+    style: {'--exc-color': file.excursionColor},
+  });
 
   // Activity-cancelled banner (top)
   if (sheetMeta.activityCancelled) {
@@ -4012,6 +4145,43 @@ function renderExcursionCard(file, sheet) {
       )
     );
     card.append(banner);
+  }
+
+  // Day-complete banner (mutually exclusive with activity-cancelled)
+  if (sheetMeta.completed && !sheetMeta.activityCancelled) {
+    const when = sheetMeta.completedAt ? new Date(sheetMeta.completedAt).toLocaleString() : '';
+    card.append(el('div', {class: 'day-complete-banner'},
+      el('div', {class:'acb-main'},
+        el('strong', {}, 'DAY COMPLETE'),
+        ' · closed by ', sheetMeta.completedBy || 'unknown',
+        when ? ` · ${when}` : '',
+      ),
+      el('div', {class:'acb-side'},
+        el('button', {class:'btn btn-small', onclick: () => {
+          if (!confirm('Re-open this day for edits?')) return;
+          setSheetMeta(file, sheet.sheetName, {completed: false, completedAt: '', completedBy: ''});
+          rebuildBookings(); updateStatus();
+          toast('Day re-opened', 'success'); renderDateStrip(); renderView();
+        }}, 'Re-open'),
+      ),
+    ));
+  }
+
+  // Sync awareness banners (peer lock + remote-changed-while-dirty)
+  if (file.lockedBy && file.lockedBy.userId !== STATE.userId) {
+    card.append(el('div', {class:'sync-banner sync-locked'},
+      el('span', {class:'pill pill-warn'}, 'Editing now: ', file.lockedBy.userId),
+      el('span', {style:{color:'var(--muted)', fontSize:'12px'}}, 'Save will queue behind theirs.')
+    ));
+  }
+  if (file.remoteChanged) {
+    card.append(el('div', {class:'sync-banner sync-remote'},
+      el('span', {}, 'Updated by ', el('strong', {}, file.lockedBy?.userId || 'someone'), ' on disk — your edits will overwrite unless you reload.'),
+      el('button', {class:'btn btn-small', onclick: async () => {
+        try { await reloadFile(file); toast('Reloaded'); renderView(); }
+        catch (e) { toast('Reload failed: ' + e.message, 'error'); }
+      }}, 'Reload')
+    ));
   }
 
   // Capacity edit popover
@@ -4042,7 +4212,10 @@ function renderExcursionCard(file, sheet) {
 
   // Decide which bookings to show
   const showCancelled = STATE.showCancelled;
-  const visibleBookings = showCancelled ? allBookings : activeBookings;
+  const visibleBookings = applyStatusFilter(
+    showCancelled ? allBookings : activeBookings,
+    STATE.agendaFilter
+  );
 
   if (visibleBookings.length === 0) {
     card.append(el('div', {class:'empty-card-body'},
@@ -4098,7 +4271,20 @@ function renderExcursionCard(file, sheet) {
     ),
     el('div', {style:{flex:1}}),
   );
-  if (!sheetMeta.activityCancelled) {
+  if (!sheetMeta.activityCancelled && !sheetMeta.completed) {
+    footer.append(el('button', {
+      class: 'btn',
+      title: 'Mark this excursion as departed and closed for the day',
+      onclick: () => {
+        setSheetMeta(file, sheet.sheetName, {
+          completed: true,
+          completedAt: nowISO(),
+          completedBy: STATE.userId || 'unknown',
+        });
+        rebuildBookings(); updateStatus();
+        toast('Day marked complete', 'success'); renderDateStrip(); renderView();
+      },
+    }, 'Mark day complete'));
     footer.append(el('button', {
       class: 'btn btn-link-danger',
       onclick: () => openActivityCancelModal(file, sheet),
@@ -4538,6 +4724,27 @@ function openGuestDetail(name, list) {
   openModal(node);
 }
 
+const STATUS_FILTERS = [
+  {key:'all',       label:'All',          test: () => true},
+  {key:'active',    label:'Active',       test: b => (b.status === 'active' || !b.status)},
+  {key:'cancelled', label:'Cancelled',    test: b => b.status === 'cancelled'},
+  {key:'postponed', label:'Postponed',    test: b => b.status === 'postponed'},
+  {key:'unpaid',    label:'Pending paid', test: b => (b.status === 'active' || !b.status) && b.paid !== 'yes' && b.paid !== 'comp'},
+  {key:'noshow',    label:'No-shows',     test: b => b.attended === 'no'},
+];
+function applyStatusFilter(list, key) {
+  const f = STATUS_FILTERS.find(x => x.key === key) || STATUS_FILTERS[0];
+  return list.filter(f.test);
+}
+function renderStatusFilterChips(stateKey, onChange) {
+  return el('div', {class:'filter-chips'},
+    ...STATUS_FILTERS.map(f => el('button', {
+      class: 'filter-chip' + (STATE[stateKey] === f.key ? ' is-on' : ''),
+      onclick: () => { STATE[stateKey] = f.key; onChange(); },
+    }, f.label))
+  );
+}
+
 /* ============================================================
    Search results (across all dates / guests)
    ============================================================ */
@@ -4549,6 +4756,7 @@ function renderSearchResults() {
     const hay = [b.guest, b.room, b.remarks, b.staff, b.billNo, b.liability].join(' ').toLowerCase();
     return hay.includes(q);
   });
+  list = applyStatusFilter(list, STATE.searchFilter);
   list.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||'') || a.excursionName.localeCompare(b.excursionName));
 
   const heading = el('div', {class:'day-heading'},
@@ -4556,6 +4764,7 @@ function renderSearchResults() {
     el('div', {class:'day-summary'}, `for "${STATE.search}"`)
   );
   wrap.append(heading);
+  wrap.append(renderStatusFilterChips('searchFilter', () => renderView()));
 
   if (!list.length) {
     wrap.append(makeEmpty("Nothing's biting. Try another search.", 'Try a different name, room number, or bill number.'));
@@ -4906,6 +5115,16 @@ function openAddModal(prefill = {}) {
 
 function openEditModal(b) {
   const file = STATE.files.find(f => f.name === b.fileKey);
+  const sheetMeta = file ? getSheetMeta(file, b.sheetName) : {};
+  const dayClosedBanner = sheetMeta.completed
+    ? el('div', {class: 'status-banner is-postponed', style: {display: ''}},
+        el('div', {},
+          el('strong', {}, 'DAY CLOSED'),
+          ' · this excursion was marked complete',
+          sheetMeta.completedBy ? ` by ${sheetMeta.completedBy}` : '',
+          '. Edits are still possible but other operators may not expect them.'),
+      )
+    : null;
 
   const room = el('input', {type:'text', value: b.room || ''});
   const guest = el('input', {type:'text', value: b.guest || ''});
@@ -5144,6 +5363,7 @@ function openEditModal(b) {
       el('span', {}, b.excursionName, ' · ', fmtDateLong(b.dateISO), ' · slot ', String(b.slot ?? '?'))
     ),
     statusBanner,
+    dayClosedBanner,
     el('div', {class:'modal-legend'}, el('span', {class:'req'}, '•'), ' marks required fields.'),
     el('div', {class:'body'},
       el('div', {class:'form-section'}, 'Booking'),
@@ -6118,6 +6338,7 @@ $('#btn-add').addEventListener('click', () => openAddModal({dateISO: STATE.selec
 $('#btn-save').addEventListener('click', saveAll);
 $('#btn-reload').addEventListener('click', reload);
 $('#btn-inhouse').addEventListener('click', openInhouseModal);
+$('#user-chip').addEventListener('click', () => { promptForUserId(); });
 $('#btn-settings').addEventListener('click', openExcursionSettingsModal);
 loadExcursionConfig();
 
