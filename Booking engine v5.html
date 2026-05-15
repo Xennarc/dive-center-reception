@@ -1042,6 +1042,34 @@ animation: spin .6s linear infinite;
 .activity-cancelled-banner .acb-main { flex: 1; min-width: 200px; }
 .activity-cancelled-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
+/* Multi-user sync banners on excursion cards */
+.sync-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 12px; font-size: 12px;
+}
+.sync-banner.sync-locked {
+  background: rgba(224, 163, 60, 0.10);
+  border-bottom: 1px solid rgba(224, 163, 60, 0.30);
+  color: var(--rd-warning);
+}
+.sync-banner.sync-remote {
+  background: rgba(43, 140, 140, 0.08);
+  border-bottom: 1px solid rgba(43, 140, 140, 0.30);
+  color: var(--primary);
+}
+.sync-banner.sync-remote strong { color: var(--ink); }
+
+/* Header user identity chip */
+.user-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--border-strong);
+  color: var(--ink); font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: border-color .12s;
+}
+.user-chip:hover { border-color: var(--primary); }
+.user-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+
 /* Capacity override pencil button + popover */
 .cap-edit-btn {
   margin-left: 6px; padding: 0 4px; font-size: 11px; line-height: 1;
@@ -1183,6 +1211,9 @@ animation: spin .6s linear infinite;
     </button>
     <div class="spacer"></div>
     <div id="status-area" style="display:none; gap: 6px; align-items:center;">
+      <button id="user-chip" class="user-chip" title="Click to change">
+        <span class="user-chip-dot"></span><span id="user-chip-name">—</span>
+      </button>
       <span id="status-pill" class="status-pill"><span class="dot"></span><span id="status-text">Ready</span></span>
       <span id="saving-indicator" class="saving-indicator" title="A save is in progress — closing now risks corrupting the file">
         <span class="spinner"></span><span>Saving — please don't close</span>
@@ -2898,7 +2929,31 @@ async function pollExternalChanges() {
       dirtyRemoteSeen = true;
     }
   }
-  if (anyReloaded) {
+
+  // Scan peer locks so the UI can show who else is editing.
+  let lockChanged = false;
+  const peerLocks = new Map();
+  try {
+    for await (const [name, h] of STATE.dirHandle.entries()) {
+      const m = /^~\$(.+)\.savelock\.(.+)$/.exec(name);
+      if (!m) continue;
+      if (m[2] === SESSION_ID) continue;
+      try {
+        const body = JSON.parse(await (await h.getFile()).text());
+        if (body && body.userId) peerLocks.set(m[1], body);
+      } catch (_) {}
+    }
+  } catch (_) {}
+  for (const f of STATE.files) {
+    const next = peerLocks.get(f.name) || null;
+    const prev = f.lockedBy || null;
+    const sameUser = (next && prev && next.userId === prev.userId);
+    const bothNull = (!next && !prev);
+    if (!sameUser && !bothNull) lockChanged = true;
+    f.lockedBy = next;
+  }
+
+  if (anyReloaded || lockChanged) {
     renderView();
     renderDateStrip();
     updateStatus();
@@ -2924,6 +2979,12 @@ function loadUserId() {
     const v = localStorage.getItem('reefdesk:userId');
     if (v) STATE.userId = v;
   } catch (_) {}
+  updateUserChip();
+}
+
+function updateUserChip() {
+  const node = document.getElementById('user-chip-name');
+  if (node) node.textContent = STATE.userId || '—';
 }
 
 function promptForUserId() {
@@ -2934,6 +2995,7 @@ function promptForUserId() {
       if (!v) { input.focus(); return; }
       try { localStorage.setItem('reefdesk:userId', v); } catch (_) {}
       STATE.userId = v;
+      updateUserChip();
       closeModal();
       resolve(v);
     };
@@ -3340,6 +3402,23 @@ function renderExcursionCard(file, sheet) {
       )
     );
     card.append(banner);
+  }
+
+  // Sync awareness banners (peer lock + remote-changed-while-dirty)
+  if (file.lockedBy && file.lockedBy.userId !== STATE.userId) {
+    card.append(el('div', {class:'sync-banner sync-locked'},
+      el('span', {class:'pill pill-warn'}, 'Editing now: ', file.lockedBy.userId),
+      el('span', {style:{color:'var(--muted)', fontSize:'12px'}}, 'Save will queue behind theirs.')
+    ));
+  }
+  if (file.remoteChanged) {
+    card.append(el('div', {class:'sync-banner sync-remote'},
+      el('span', {}, 'Updated by ', el('strong', {}, file.lockedBy?.userId || 'someone'), ' on disk — your edits will overwrite unless you reload.'),
+      el('button', {class:'btn btn-small', onclick: async () => {
+        try { await reloadFile(file); toast('Reloaded'); renderView(); }
+        catch (e) { toast('Reload failed: ' + e.message, 'error'); }
+      }}, 'Reload')
+    ));
   }
 
   // Capacity edit popover
@@ -5255,6 +5334,7 @@ $('#btn-add').addEventListener('click', () => openAddModal({dateISO: STATE.selec
 $('#btn-save').addEventListener('click', saveAll);
 $('#btn-reload').addEventListener('click', reload);
 $('#btn-inhouse').addEventListener('click', openInhouseModal);
+$('#user-chip').addEventListener('click', () => { promptForUserId(); });
 
 $$('.seg-btn').forEach(btn => btn.addEventListener('click', ()=>{
   $$('.seg-btn').forEach(b=>b.classList.remove('is-active'));
