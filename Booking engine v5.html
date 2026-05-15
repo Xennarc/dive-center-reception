@@ -1296,6 +1296,9 @@ animation: spin .6s linear infinite;
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
         Reports<span id="inhouse-badge" class="btn-badge" style="display:none">0</span>
       </button>
+      <button id="btn-settings" class="btn-icon" title="Excursion settings" aria-label="Excursion settings">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
       <button id="btn-add" class="btn btn-primary">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         New booking
@@ -1353,6 +1356,8 @@ const STATE = {
   inhouseReports: [],        // [{filename, property, businessDate, guestCount, error?}]
   userId: null,              // operator name; persisted at localStorage['reefdesk:userId']
   saving: new Set(),         // filenames currently mid-save (poller skips these)
+  excursionConfig: null,     // { excursions: { <key>: { multiBoat, maxPax, boatPool[], defaultBoatCount } } } — mirrors localStorage['reefdesk:excursionConfig']
+  warnedSumFormula: new Set(),// one-shot toast guard for non-standard TOTAL formulas
 };
 
 const PALETTE = ['#1B4965','#3D6975','#4A7C59','#856437','#A85A4A','#5E5081','#9C7A2C','#3A7866','#6B5070','#7A4E3A'];
@@ -1594,15 +1599,18 @@ function detectLayout(ws) {
   }
 
   const firstBooking = headerRow + 1;
-  let lastBooking = firstBooking, totalRow = -1;
+  let lastBooking = firstBooking, totalRow = -1, totalMarkerCol = -1;
   const limit = Math.max(60, ws.actualRowCount || 60);
   for (let r = firstBooking; r <= limit; r++) {
     const row = ws.getRow(r);
     const cells = [];
     const colCount = Math.max(row.cellCount, 12);
     for (let c = 1; c <= colCount; c++) cells.push(cellRaw(row.getCell(c)));
-    const hasTotal = cells.some(v => typeof v === 'string' && /^\s*total\s*$/i.test(v));
-    if (hasTotal) { totalRow = r; break; }
+    let totalColHit = -1;
+    for (let c = 0; c < cells.length; c++) {
+      if (typeof cells[c] === 'string' && /^\s*total\s*$/i.test(cells[c])) { totalColHit = c + 1; break; }
+    }
+    if (totalColHit > 0) { totalRow = r; totalMarkerCol = totalColHit; break; }
     const policyHit = cells.some(v => typeof v === 'string' && /general\s+policies/i.test(v));
     if (policyHit) { totalRow = r; break; }
     lastBooking = r;
@@ -1613,7 +1621,110 @@ function detectLayout(ws) {
   let excursionName = (title || 'Excursion').split(/\(MAX|USD\$|MAX\s*\d/i)[0].trim();
   excursionName = excursionName.replace(/\s+/g,' ').trim();
 
-  return { headerRow, firstBooking, lastBooking, layout, capacity, dateISO, title, excursionName };
+  return { headerRow, firstBooking, lastBooking, totalRow, totalMarkerCol, layout, capacity, dateISO, title, excursionName };
+}
+
+/* ============================================================
+   Column layouts (multi-boat registry)
+   - Per-excursion declared column map keyed by stable slug.
+   - Matched against a file via `fileGlob` (RegExp).
+   - Used by the multi-boat save path (ensureCapacity, separator emission)
+     where we need fixed column indices rather than runtime-detected ones.
+   - Unknown files fall back to runtime detectLayout() — preserves current
+     behaviour for new templates the receptionists drop in.
+   ============================================================ */
+const COLUMN_LAYOUTS = {
+  '01_sunset_dolphin_cruise': {
+    fileGlob: /01[\s_-]*Sunset Dolphin Cruise/i,
+    excursionName: 'Sunset Dolphin Cruise',
+    headerRow: 6, firstDataRow: 8, totalMarkerCol: 6,
+    cols: { room: 4, guest: 5, departure: 6, adults: 7, child: 8, liability: 9, remarks: 10, staff: 11 },
+    multiBoatDefault: true,
+    defaultBoatCount: 2,
+    defaultMaxPax: 24,
+  },
+  '02_snorkeling_excursion': {
+    fileGlob: /02[\s_-]*Snorkeling Excursion/i,
+    excursionName: 'Snorkeling Excursion',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, billNo: 8, remarks: 9, staff: 10 },
+  },
+  '03_bottom_fishing': {
+    fileGlob: /03[\s_-]*Bottom Fishing/i,
+    excursionName: 'Bottom Fishing',
+    headerRow: 7, firstDataRow: 8, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, billNo: 8, remarks: 9, staff: 10 },
+  },
+  '04_starry_night': {
+    fileGlob: /04[\s_-]*Starry Night/i,
+    excursionName: 'Starry Night',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, billNo: 8, remarks: 9, staff: 10 },
+  },
+  '05_local_island_excursion': {
+    fileGlob: /05[\s_-]*Local island excursion/i,
+    excursionName: 'Local Island Excursion',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 5,
+    cols: { room: 3, guest: 4, departure: 5, adults: 6, child: 7, liability: 8, billNo: 9, remarks: 10, staff: 11 },
+  },
+  '06_desert_island_adventure': {
+    fileGlob: /06[\s_-]*Desert island Adventure/i,
+    excursionName: 'Desert Island Adventure',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, billNo: 8, remarks: 9, staff: 10 },
+  },
+  '07_fullday_snorkeling': {
+    fileGlob: /07[\s_-]*Fullday snorkeling/i,
+    excursionName: 'Fullday Snorkeling',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, billNo: 8, remarks: 9, staff: 10 },
+  },
+  '09_hr_snorkeling_complimentary': {
+    fileGlob: /09[\s_-]*HR Snorkeling complimentary/i,
+    excursionName: 'HR Snorkeling Complimentary',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, remarks: 8, staff: 9 },
+  },
+  '09_korean_hro': {
+    fileGlob: /09[\s_-]*Korean HRO/i,
+    excursionName: 'Korean HRO',
+    headerRow: 6, firstDataRow: 7, totalMarkerCol: 4,
+    cols: { room: 2, guest: 3, departure: 4, adults: 5, child: 6, liability: 7, remarks: 8, staff: 9 },
+  },
+  // 10 - TRy Dive COMPLYMENTARY is intentionally excluded: no TOTAL row,
+  // single `pax` column instead of adults/child. The boat strip and
+  // rebuildBoatGroupings explicitly skip files that don't resolve to a
+  // COLUMN_LAYOUTS entry, so it keeps the existing single-boat write path.
+};
+
+function excursionKeyFor(fileName) {
+  if (!fileName) return null;
+  for (const [key, layout] of Object.entries(COLUMN_LAYOUTS)) {
+    if (layout.fileGlob.test(fileName)) return key;
+  }
+  return null;
+}
+function getLayoutFor(fileName) {
+  const key = excursionKeyFor(fileName);
+  return key ? COLUMN_LAYOUTS[key] : null;
+}
+function verifyLayoutAgainstSheet(declared, ws) {
+  // Soft sanity check: each declared logical column's header cell should
+  // classify to the same logical name via the existing HEADER_KEYS table.
+  // A miss returns the offending column for the caller to toast.
+  const mismatches = [];
+  for (const [logical, colIdx] of Object.entries(declared.cols)) {
+    const cell = ws.getRow(declared.headerRow).getCell(colIdx);
+    const v = cellRaw(cell);
+    const got = classifyHeader(v);
+    if (got !== logical) {
+      // Treat `child` <-> `children` and `adults` <-> `pax` aliasing as ok
+      const aliases = { adults: ['pax'], child: ['children', 'kids'] };
+      if ((aliases[logical] || []).includes(got)) continue;
+      mismatches.push({ logical, colIdx, got, raw: v });
+    }
+  }
+  return mismatches;
 }
 
 /* ============================================================
@@ -1635,6 +1746,11 @@ function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, date
   const staff = cellStr(at(layout.layout.staff));
   const isEmpty = !room && !guest && adults == null && child == null
     && !liability && !billNo && !remarks && !staff && !departureRaw;
+  // Separator row: room empty, departure cell carries "BOAT N", guest cell
+  // carries the boat name. Used by multi-boat sheets (currently only
+  // Sunset Dolphin Cruise) and inferred from those rows on load.
+  const departureStr = typeof departureRaw === 'string' ? departureRaw : '';
+  const isSeparator = !room && /^\s*BOAT\s*\d+\s*$/i.test(departureStr) && !!guest;
   const meta = getBookingMeta(fileEntry, sheetName, rowIdx);
   return {
     id: `${fileKey}::${sheetName}::${rowIdx}`,
@@ -1642,7 +1758,9 @@ function readBooking(ws, sheetName, fileKey, layout, rowIdx, excursionName, date
     excursionName, excursionColor, capacity, dateISO,
     slot, room, guest, departure, departureRaw,
     adults, child, liability, billNo, remarks, staff,
-    isEmpty,
+    isEmpty, isSeparator,
+    separatorBoatLabel: isSeparator ? departureStr.trim().toUpperCase() : null,
+    separatorBoatName:  isSeparator ? guest : null,
     status: meta.status,
     cancelReason: meta.cancelReason,
     cancelledAt: meta.cancelledAt,
@@ -1781,7 +1899,9 @@ const META_SHEET_SHEET   = '_SheetMeta';
 const META_SHEET_NAMES   = [META_BOOKING_SHEET, META_SHEET_SHEET];
 
 const BOOKING_META_COLS = ['sheetName','rowIdx','status','cancelReason','cancelledAt','postponedTo','postponedRef','attended','paid','paidAt'];
-const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity','completed','completedAt','completedBy'];
+const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity','completed','completedAt','completedBy','boats','assignments'];
+// JSON-serialised fields. Empty array / object collapses to empty cell.
+const SHEET_META_JSON_COLS = new Set(['boats','assignments']);
 
 const BOOKING_META_DEFAULTS = {
   status: 'active', cancelReason: '', cancelledAt: '',
@@ -1792,6 +1912,7 @@ const SHEET_META_DEFAULTS = {
   activityCancelled: false, cancelReasonCat: '', cancelReasonNote: '',
   guestsInformed: false, cancelledAt: '', customCapacity: null,
   completed: false, completedAt: '', completedBy: '',
+  boats: [], assignments: {},
 };
 
 function nowISO() { return new Date().toISOString(); }
@@ -1851,6 +1972,10 @@ function readMetaSheets(wb) {
         if (v == null || v === '') continue;
         if (col === 'activityCancelled' || col === 'guestsInformed' || col === 'completed') obj[col] = asBool(v);
         else if (col === 'customCapacity') { const n = Number(v); obj[col] = isNaN(n) ? null : n; }
+        else if (SHEET_META_JSON_COLS.has(col)) {
+          try { obj[col] = JSON.parse(String(v)); }
+          catch (e) { console.warn(`_SheetMeta ${col} JSON parse failed for ${sheetName}:`, e); }
+        }
         else obj[col] = String(v);
       }
       sheetMeta.set(sheetName, obj);
@@ -1885,12 +2010,25 @@ function ensureMetaSheets(wb) {
   } else {
     sws.state = 'hidden';
     const headerRow = sws.getRow(1);
-    let hasHeader = false;
-    for (let c = 1; c <= SHEET_META_COLS.length; c++) {
-      if (cellStr(headerRow.getCell(c))) { hasHeader = true; break; }
+    const present = new Set();
+    let anyHeader = false;
+    const colCount = Math.max(headerRow.cellCount, SHEET_META_COLS.length);
+    for (let c = 1; c <= colCount; c++) {
+      const h = cellStr(headerRow.getCell(c));
+      if (h) { present.add(h); anyHeader = true; }
     }
-    if (!hasHeader) {
+    if (!anyHeader) {
       SHEET_META_COLS.forEach((h, i) => { headerRow.getCell(i+1).value = h; });
+      headerRow.commit();
+    } else {
+      // Additive: append any columns missing from the existing header
+      // (boats, assignments on workbooks that pre-date this change).
+      let nextCol = headerRow.cellCount;
+      for (const col of SHEET_META_COLS) {
+        if (present.has(col)) continue;
+        nextCol += 1;
+        headerRow.getCell(nextCol).value = col;
+      }
       headerRow.commit();
     }
   }
@@ -1918,6 +2056,12 @@ function flushMetaSheets(fileEntry) {
       const merged = { sheetName, ...partial };
       sws.addRow(SHEET_META_COLS.map(c => {
         const v = merged[c];
+        if (SHEET_META_JSON_COLS.has(c)) {
+          if (v == null) return '';
+          if (Array.isArray(v) && v.length === 0) return '';
+          if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) return '';
+          try { return JSON.stringify(v); } catch (_) { return ''; }
+        }
         if (v == null || v === '') return '';
         if (typeof v === 'boolean') return v ? 'true' : 'false';
         return v;
@@ -1966,11 +2110,19 @@ function setSheetMeta(fileEntry, sheetName, partial, opts) {
   const existing = fileEntry.sheetMeta.get(sheetName) || {};
   const merged = { ...existing, ...partial };
   for (const k of Object.keys(merged)) {
-    if (merged[k] == null || merged[k] === '') delete merged[k];
+    const v = merged[k];
+    if (v == null || v === '') delete merged[k];
+    else if (Array.isArray(v) && v.length === 0) delete merged[k];
+    else if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) delete merged[k];
   }
-  const meaningful = Object.entries(merged).some(([k, v]) =>
-    SHEET_META_DEFAULTS[k] === undefined ? v != null && v !== '' : v !== SHEET_META_DEFAULTS[k]
-  );
+  const meaningful = Object.entries(merged).some(([k, v]) => {
+    const dflt = SHEET_META_DEFAULTS[k];
+    if (dflt === undefined) return v != null && v !== '';
+    if (typeof dflt === 'object' && dflt !== null) {
+      try { return JSON.stringify(v) !== JSON.stringify(dflt); } catch (_) { return true; }
+    }
+    return v !== dflt;
+  });
   if (!meaningful) fileEntry.sheetMeta.delete(sheetName);
   else fileEntry.sheetMeta.set(sheetName, merged);
   fileEntry.dirty = true;
@@ -1992,24 +2144,200 @@ function toDeparture(s) {
 }
 
 /* ============================================================
+   Excursion config (settings store)
+   - Per-excursion toggle for multiBoat, maxPax, defaultBoatCount, and a
+     boatPool of remembered names.
+   - Lives in localStorage['reefdesk:excursionConfig'] so it survives
+     reloads but doesn't ride along inside the .xlsx files.
+   - Per-day boat state (which boats exist on a given date, who's
+     assigned to which) lives in _SheetMeta — that's the source of truth.
+   ============================================================ */
+const EXCURSION_CONFIG_KEY = 'reefdesk:excursionConfig';
+const EXCURSION_CONFIG_DEFAULTS = { multiBoat: false, maxPax: 0, defaultBoatCount: 1, boatPool: [] };
+
+function loadExcursionConfig() {
+  let parsed = null;
+  try { parsed = JSON.parse(localStorage.getItem(EXCURSION_CONFIG_KEY) || 'null'); }
+  catch (_) { parsed = null; }
+  const out = { excursions: {} };
+  const stored = (parsed && parsed.excursions) || {};
+  for (const key of Object.keys(COLUMN_LAYOUTS)) {
+    const dflt = COLUMN_LAYOUTS[key];
+    out.excursions[key] = {
+      ...EXCURSION_CONFIG_DEFAULTS,
+      multiBoat: !!dflt.multiBoatDefault,
+      maxPax: dflt.defaultMaxPax || 0,
+      defaultBoatCount: dflt.defaultBoatCount || 1,
+      boatPool: [],
+      ...(stored[key] || {}),
+    };
+    // Dedupe boat pool by name, preserve order.
+    const seen = new Set();
+    out.excursions[key].boatPool = (out.excursions[key].boatPool || []).filter(name => {
+      const k = String(name || '').trim();
+      if (!k || seen.has(k.toLowerCase())) return false;
+      seen.add(k.toLowerCase()); return true;
+    });
+  }
+  STATE.excursionConfig = out;
+  return out;
+}
+function saveExcursionConfig() {
+  if (!STATE.excursionConfig) return;
+  try { localStorage.setItem(EXCURSION_CONFIG_KEY, JSON.stringify(STATE.excursionConfig)); }
+  catch (e) { console.warn('saveExcursionConfig', e); }
+}
+function getExcursionConfig(key) {
+  if (!STATE.excursionConfig) loadExcursionConfig();
+  return (STATE.excursionConfig.excursions && STATE.excursionConfig.excursions[key])
+    || { ...EXCURSION_CONFIG_DEFAULTS };
+}
+function isMultiBoatFile(fileEntry) {
+  const key = excursionKeyFor(fileEntry && fileEntry.name);
+  if (!key) return false;
+  return !!getExcursionConfig(key).multiBoat;
+}
+
+function openExcursionSettingsModal() {
+  if (!STATE.excursionConfig) loadExcursionConfig();
+  const body = el('div', { class: 'exc-settings-modal', style: { maxWidth: '640px' } },
+    el('h2', {}, 'Excursion settings'),
+    el('p', { class: 'muted', style: { fontSize: '13px', margin: '0 0 14px' } },
+      'Toggle multi-boat mode and edit the cached boat-name pool for each excursion. ',
+      'Per-day boat lists live inside the workbook itself — this screen only controls ',
+      'defaults and what shows up in the "+ Add boat" picker.'),
+  );
+  const list = el('div', { class: 'exc-settings-list' });
+  for (const [key, layout] of Object.entries(COLUMN_LAYOUTS)) {
+    const cfg = STATE.excursionConfig.excursions[key];
+    const row = el('div', { class: 'exc-settings-row', style: { borderTop: '1px solid var(--line)', padding: '12px 0', display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' } });
+
+    const multiBoatChk = el('input', { type: 'checkbox', id: 'mb-' + key, checked: cfg.multiBoat ? 'checked' : false });
+    multiBoatChk.checked = !!cfg.multiBoat;
+    multiBoatChk.addEventListener('change', () => {
+      cfg.multiBoat = multiBoatChk.checked;
+      saveExcursionConfig();
+      poolWrap.style.display = cfg.multiBoat ? '' : 'none';
+      renderView();
+    });
+    const maxPaxInp = el('input', { type: 'number', min: '0', value: String(cfg.maxPax || 0), style: { width: '72px' } });
+    maxPaxInp.addEventListener('change', () => {
+      const n = Number(maxPaxInp.value);
+      cfg.maxPax = isNaN(n) ? 0 : Math.max(0, n);
+      saveExcursionConfig();
+    });
+
+    const top = el('div', {},
+      el('div', { style: { fontWeight: '600' } }, layout.excursionName),
+      el('div', { class: 'muted', style: { fontSize: '12px' } }, key),
+    );
+    const right = el('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } },
+      el('label', { style: { fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' } },
+        multiBoatChk, ' Multi-boat'),
+      el('label', { style: { fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' } },
+        'Max pax ', maxPaxInp),
+    );
+    row.append(top, right);
+
+    const poolWrap = el('div', { style: { gridColumn: '1 / -1', display: cfg.multiBoat ? '' : 'none' } });
+    const renderPool = () => {
+      poolWrap.innerHTML = '';
+      const chips = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' } });
+      cfg.boatPool.forEach((name, i) => {
+        chips.append(el('span', {
+          class: 'pill',
+          style: { display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'default' }
+        }, name,
+          el('button', {
+            class: 'btn-icon',
+            title: 'Remove from pool',
+            style: { padding: '0 2px', fontSize: '11px' },
+            onclick: () => { cfg.boatPool.splice(i, 1); saveExcursionConfig(); renderPool(); }
+          }, '×')
+        ));
+      });
+      const addInp = el('input', { type: 'text', placeholder: 'Add boat name…', style: { width: '160px' } });
+      addInp.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const v = String(addInp.value || '').trim();
+        if (!v) return;
+        if (!cfg.boatPool.some(n => n.toLowerCase() === v.toLowerCase())) {
+          cfg.boatPool.push(v);
+          saveExcursionConfig();
+        }
+        addInp.value = '';
+        renderPool();
+      });
+      poolWrap.append(
+        el('div', { class: 'muted', style: { fontSize: '12px', marginTop: '6px' } }, 'Boat pool (cached names)'),
+        chips,
+        el('div', { style: { marginTop: '6px' } }, addInp,
+          el('span', { class: 'muted', style: { fontSize: '11px', marginLeft: '6px' } }, '— press Enter to add')
+        ),
+      );
+    };
+    renderPool();
+    row.append(poolWrap);
+    list.append(row);
+  }
+  body.append(list,
+    el('div', { class: 'foot', style: { display: 'flex', justifyContent: 'flex-end', marginTop: '14px' } },
+      el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Done')
+    )
+  );
+  openModal(body);
+}
+
+/* ============================================================
    File load
    ============================================================ */
 async function loadFiles(fileSpecs){
   STATE.files = [];
   STATE.bookings = [];
   STATE.excursions = [];
+  if (!STATE.excursionConfig) loadExcursionConfig();
   for (const spec of fileSpecs) {
     try {
       const buf = await spec.getBytes();
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(buf.buffer ? buf.buffer : buf);
       const sheets = [];
+      const declared = getLayoutFor(spec.name);
+      const excKey = excursionKeyFor(spec.name);
+      let layoutWarned = false;
       wb.eachSheet((ws) => {
         if (META_SHEET_NAMES.includes(ws.name)) return;
         const lay = detectLayout(ws);
-        if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
+        if (!lay) return;
+        // Soft layout self-check against the declared registry.
+        if (declared && !layoutWarned) {
+          const mismatches = verifyLayoutAgainstSheet(declared, ws);
+          if (mismatches.length) {
+            console.warn('Layout mismatch in', spec.name, ws.name, mismatches);
+            toast(`${spec.name}: header columns don't match registry — saves may be unreliable`, 'error');
+            layoutWarned = true;
+          }
+        }
+        sheets.push({ sheetName: ws.name, ws, layout: lay });
       });
       const { bookingMeta, sheetMeta } = readMetaSheets(wb);
+      // Seed inferred boats into in-memory _SheetMeta for multi-boat
+      // excursions that haven't been touched by Reef Desk yet. First save
+      // will flush them to disk.
+      if (excKey && getExcursionConfig(excKey).multiBoat) {
+        for (const s of sheets) {
+          const existing = sheetMeta.get(s.sheetName) || {};
+          if (existing.boats && existing.boats.length) continue;
+          const inferred = inferBoatsFromSheet(s.ws, s.layout);
+          if (inferred.boats.length) {
+            sheetMeta.set(s.sheetName, {
+              ...existing,
+              boats: inferred.boats,
+              assignments: inferred.assignments,
+            });
+          }
+        }
+      }
       let lastSyncedMtime = 0;
       if (spec.fileHandle && spec.fileHandle.getFile) {
         try { lastSyncedMtime = (await spec.fileHandle.getFile()).lastModified || 0; } catch (_) {}
@@ -2025,6 +2353,7 @@ async function loadFiles(fileSpecs){
         lastSyncedMtime,
         pendingOps: [],
         remoteChanged: false,
+        excursionKey: excKey,
       });
     } catch (err) {
       console.error('load failed', spec.name, err);
@@ -2070,6 +2399,21 @@ async function reloadFile(fileEntry){
     if (lay) sheets.push({ sheetName: ws.name, ws, layout: lay });
   });
   const { bookingMeta, sheetMeta } = readMetaSheets(wb);
+  const excKey = fileEntry.excursionKey || excursionKeyFor(fileEntry.name);
+  if (excKey && getExcursionConfig(excKey).multiBoat) {
+    for (const s of sheets) {
+      const existing = sheetMeta.get(s.sheetName) || {};
+      if (existing.boats && existing.boats.length) continue;
+      const inferred = inferBoatsFromSheet(s.ws, s.layout);
+      if (inferred.boats.length) {
+        sheetMeta.set(s.sheetName, {
+          ...existing,
+          boats: inferred.boats,
+          assignments: inferred.assignments,
+        });
+      }
+    }
+  }
   fileEntry.wb = wb;
   fileEntry.sheets = sheets;
   fileEntry.bookingMeta = bookingMeta;
@@ -2084,6 +2428,8 @@ function rebuildBookings(){
       const lay = s.layout;
       for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
         const b = readBooking(s.ws, s.sheetName, f.name, lay, r, f.excursionName, lay.dateISO, lay.capacity, f.excursionColor, f);
+        // Separator rows are sheet decoration for multi-boat layouts — not bookings.
+        if (b.isSeparator) continue;
         // Keep non-empty rows AND any row that has meta state (cancellation log
         // for a row whose data may have been cleared in an older version).
         if (!b.isEmpty || (b.status && b.status !== 'active')) out.push(b);
@@ -2152,6 +2498,12 @@ async function saveAll() {
           }
         }
 
+        try { await rebuildBoatGroupings(f); }
+        catch (e) {
+          console.error('rebuildBoatGroupings', f.name, e);
+          toast(`Couldn't save ${f.name}: ${e.message}`, 'error');
+          continue;
+        }
         flushMetaSheets(f);
         // Capture the on-disk bytes BEFORE ExcelJS overwrites them — the
         // preservation pass below splices preserved parts (drawings,
@@ -2209,6 +2561,12 @@ async function saveAll() {
         }
       } else {
         // 'fp' mode — manual file picker, sync is silently disabled.
+        try { await rebuildBoatGroupings(f); }
+        catch (e) {
+          console.error('rebuildBoatGroupings', f.name, e);
+          toast(`Couldn't save ${f.name}: ${e.message}`, 'error');
+          continue;
+        }
         flushMetaSheets(f);
         const originalBuf = await captureOriginalBytes(f);
         const excelBuf = await f.wb.xlsx.writeBuffer();
@@ -2281,6 +2639,343 @@ async function reload() {
   } else {
     toast('Reload only works with shared-folder mode');
   }
+}
+
+/* ============================================================
+   Boat assignment
+   - Multi-boat excursions (currently only Sunset Dolphin Cruise) split a
+     day's bookings into separator-row-delimited groups in the workbook.
+   - Per-day state lives in _SheetMeta.boats and _SheetMeta.assignments.
+   - On save, rebuildBoatGroupings re-emits separators + grouped data
+     rows above the TOTAL row, growing the data range via ensureCapacity
+     when more rows are needed than the template provides.
+   ============================================================ */
+/* === BOAT_INFER_BEGIN === */
+function boatKey(b) {
+  // Stable key independent of row position. departure may arrive as Date,
+  // string, or ISO — normalise to YYYY-MM-DD when possible, otherwise raw.
+  let dep = '';
+  if (b && b.departure) {
+    dep = String(b.departure).slice(0, 10);
+  } else if (b && b.departureRaw) {
+    dep = String(b.departureRaw).slice(0, 10);
+  }
+  const room = (b && b.room) ? String(b.room).trim() : '';
+  const guest = (b && b.guest) ? String(b.guest).trim() : '';
+  return `${room}|${guest}|${dep}`;
+}
+function _newBoatId() {
+  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return 'b-' + crypto.randomUUID(); } catch (_) {}
+  return 'b-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+}
+function inferBoatsFromSheet(ws, layout) {
+  // Walk the data range top-to-bottom. Separator rows (empty room +
+  // /^BOAT N$/ in the departure col) start a new group; subsequent
+  // non-empty rows belong to that group's boat until the next separator.
+  // Sheets without separators → empty inference (caller treats day as
+  // single-boat-still-multiBoat-default).
+  const boats = [];
+  const assignments = {};
+  if (!layout || layout.totalRow == null || layout.totalRow <= 0) {
+    return { boats, assignments };
+  }
+  const cols = layout.layout || {};
+  const roomCol = cols.room, guestCol = cols.guest, departureCol = cols.departure;
+  if (!roomCol || !guestCol || !departureCol) return { boats, assignments };
+  const firstData = layout.firstBooking;
+  const lastData = layout.totalRow - 1;
+  let currentBoatId = null;
+  let boatIdx = 0;
+  for (let r = firstData; r <= lastData; r++) {
+    const row = ws.getRow(r);
+    const roomVal = cellStr(row.getCell(roomCol));
+    const guestVal = cellStr(row.getCell(guestCol));
+    const depVal = cellRaw(row.getCell(departureCol));
+    const depStr = typeof depVal === 'string' ? depVal.trim() : '';
+    if (!roomVal && /^BOAT\s*\d+$/i.test(depStr) && guestVal) {
+      boatIdx += 1;
+      const id = _newBoatId();
+      boats.push({ id, name: guestVal, capacity: 0 });
+      currentBoatId = id;
+      continue;
+    }
+    if (!currentBoatId) continue;
+    if (!roomVal && !guestVal) continue;
+    const dep = parseDateValue(depVal) || (depStr ? depStr.slice(0, 10) : '');
+    const key = `${roomVal || ''}|${guestVal || ''}|${dep || ''}`;
+    assignments[key] = currentBoatId;
+  }
+  // Backfill a fair capacity guess: split remaining data-row count across boats.
+  if (boats.length > 0) {
+    const totalSlots = lastData - firstData + 1 - boats.length;
+    const per = Math.max(0, Math.floor(totalSlots / boats.length));
+    boats.forEach(b => { if (!b.capacity) b.capacity = per; });
+  }
+  return { boats, assignments };
+}
+/* === BOAT_INFER_END === */
+
+/* === ENSURE_CAPACITY_BEGIN === */
+function _cloneCellStyle(style) {
+  if (!style) return undefined;
+  try { return JSON.parse(JSON.stringify(style)); } catch (_) { return undefined; }
+}
+function cloneRowStyle(srcRow, dstRow, colCount) {
+  if (!srcRow || !dstRow) return;
+  const cols = colCount || Math.max(srcRow.cellCount, 12);
+  for (let c = 1; c <= cols; c++) {
+    const sc = srcRow.getCell(c);
+    const dc = dstRow.getCell(c);
+    const st = _cloneCellStyle(sc.style);
+    if (st) dc.style = st;
+  }
+  if (srcRow.height) dstRow.height = srcRow.height;
+  if (srcRow.outlineLevel) dstRow.outlineLevel = srcRow.outlineLevel;
+}
+function _colA(n) {
+  // 1-based column index → A1 letters
+  let s = '';
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+function rewriteSumFormulas(ws, layout, oldTotalRow, newTotalRow, warnings) {
+  // For each cell on the TOTAL row whose formula is a single
+  // SUM(<col><firstData>:<col><oldTotalRow-1>), rewrite the upper bound to
+  // newTotalRow-1. Anything else is left untouched and one-shot toasted.
+  const firstData = layout.firstBooking;
+  const oldLast = oldTotalRow - 1;
+  const newLast = newTotalRow - 1;
+  if (newLast === oldLast) return;
+  const row = ws.getRow(newTotalRow);
+  const colCount = Math.max(row.cellCount, ws.actualColumnCount || 12);
+  for (let c = 1; c <= colCount; c++) {
+    const cell = row.getCell(c);
+    const v = cell.value;
+    if (!v || typeof v !== 'object' || !v.formula) continue;
+    const f = String(v.formula).replace(/^=/, '');
+    const m = f.match(/^SUM\(([A-Z]+)(\d+):\1(\d+)\)$/i);
+    if (!m) {
+      if (warnings) warnings.push({ col: c, formula: f, why: 'non-standard' });
+      continue;
+    }
+    const col = m[1];
+    const a = parseInt(m[2], 10);
+    const b = parseInt(m[3], 10);
+    if (a !== firstData || b !== oldLast) {
+      if (warnings) warnings.push({ col: c, formula: f, why: 'range-mismatch' });
+      continue;
+    }
+    cell.value = { formula: `SUM(${col}${firstData}:${col}${newLast})`, result: v.result };
+  }
+}
+function ensureCapacity(ws, requiredRows, layout, warnings) {
+  // requiredRows = total data rows needed between firstBooking and TOTAL.
+  // Inserts blank styled rows ABOVE the TOTAL row when short. Never deletes.
+  if (!layout || !layout.totalRow || layout.totalRow <= 0) return layout.totalRow || -1;
+  const firstData = layout.firstBooking;
+  let totalRow = layout.totalRow;
+  const currentRows = totalRow - firstData;
+  if (requiredRows <= currentRows) return totalRow;
+  const toInsert = requiredRows - currentRows;
+  // Style template is the row immediately above TOTAL (last data row).
+  const srcRow = ws.getRow(totalRow - 1);
+  const colCount = Math.max(srcRow.cellCount, ws.actualColumnCount || 12);
+  // spliceRows(idx, deleteCount, ...newRows) — insert blank arrays.
+  const inserts = [];
+  for (let i = 0; i < toInsert; i++) inserts.push([]);
+  ws.spliceRows(totalRow, 0, ...inserts);
+  // After splice, the TOTAL row has moved down by `toInsert`.
+  const newTotalRow = totalRow + toInsert;
+  // Style the inserted rows from the template.
+  for (let i = 0; i < toInsert; i++) {
+    const dst = ws.getRow(totalRow + i);
+    cloneRowStyle(srcRow, dst, colCount);
+  }
+  // Bump SUM formulas on the TOTAL row.
+  rewriteSumFormulas(ws, layout, totalRow, newTotalRow, warnings);
+  // Mutate layout so subsequent calls see the new range.
+  layout.totalRow = newTotalRow;
+  layout.lastBooking = newTotalRow - 1;
+  return newTotalRow;
+}
+/* === ENSURE_CAPACITY_END === */
+
+/* === REBUILD_GROUPINGS_BEGIN === */
+function validateAssignments(sheetMeta) {
+  const errors = [];
+  const boats = (sheetMeta && sheetMeta.boats) || [];
+  const assignments = (sheetMeta && sheetMeta.assignments) || {};
+  const validIds = new Set(boats.map(b => b.id));
+  const keysSeen = new Set();
+  for (const [key, boatId] of Object.entries(assignments)) {
+    if (!validIds.has(boatId)) {
+      errors.push({ key, why: `unknown boatId ${boatId}` });
+    }
+    if (keysSeen.has(key)) {
+      errors.push({ key, why: 'duplicate booking key' });
+    }
+    keysSeen.add(key);
+  }
+  return errors;
+}
+function _writeCell(ws, row, col, value) {
+  if (!col) return;
+  const cell = ws.getRow(row).getCell(col);
+  cell.value = (value == null || value === '') ? null : value;
+}
+function _clearDataRow(ws, row, cols) {
+  for (const c of Object.values(cols)) {
+    if (!c) continue;
+    ws.getRow(row).getCell(c).value = null;
+  }
+}
+async function rebuildBoatGroupings(fileEntry) {
+  if (!isMultiBoatFile(fileEntry)) return;
+  const warnings = [];
+  for (const s of fileEntry.sheets) {
+    const lay = s.layout;
+    if (!lay.totalRow || lay.totalRow <= 0) continue;
+    const meta = getSheetMeta(fileEntry, s.sheetName);
+    const boats = meta.boats || [];
+    if (boats.length === 0) continue; // Day has no boats — leave as-is.
+    const validationErrors = validateAssignments(meta);
+    if (validationErrors.length) {
+      throw new Error(`${fileEntry.name} ${s.sheetName}: ${validationErrors.length} bad boat assignment(s) — fix before saving`);
+    }
+    // Snapshot current data rows (non-separator only) into booking objects.
+    const ws = s.ws;
+    const cols = lay.layout;
+    const bookings = [];
+    for (let r = lay.firstBooking; r <= lay.totalRow - 1; r++) {
+      const b = readBooking(ws, s.sheetName, fileEntry.name, lay, r,
+        fileEntry.excursionName, lay.dateISO, lay.capacity, fileEntry.excursionColor, fileEntry);
+      if (b.isSeparator) continue;
+      if (b.isEmpty) continue;
+      bookings.push(b);
+    }
+    // Group bookings by boat in declared order; unassigned go last.
+    const byBoat = new Map();
+    boats.forEach(b => byBoat.set(b.id, []));
+    const unassigned = [];
+    for (const bk of bookings) {
+      const bid = meta.assignments && meta.assignments[boatKey(bk)];
+      if (bid && byBoat.has(bid)) byBoat.get(bid).push(bk);
+      else unassigned.push(bk);
+    }
+    // Required rows = one separator per boat + each group's bookings + unassigned bookings.
+    const requiredRows = boats.length + bookings.length;
+    ensureCapacity(ws, requiredRows, lay, warnings);
+    // Emit separators + grouped rows. The data range now stretches from
+    // firstBooking to lay.totalRow-1 inclusive after ensureCapacity.
+    let writeRow = lay.firstBooking;
+    boats.forEach((boat, boatIdx) => {
+      // Separator: room empty, guest=boatName, departure="BOAT N"
+      _clearDataRow(ws, writeRow, cols);
+      _writeCell(ws, writeRow, cols.guest, boat.name);
+      _writeCell(ws, writeRow, cols.departure, `BOAT ${boatIdx + 1}`);
+      writeRow += 1;
+      for (const bk of (byBoat.get(boat.id) || [])) {
+        _clearDataRow(ws, writeRow, cols);
+        _writeCell(ws, writeRow, cols.room, bk.room);
+        _writeCell(ws, writeRow, cols.guest, bk.guest);
+        _writeCell(ws, writeRow, cols.departure, bk.departureRaw && typeof bk.departureRaw === 'string' && !parseDateValue(bk.departureRaw) ? bk.departureRaw : (bk.departure ? toDeparture(bk.departure) : null));
+        _writeCell(ws, writeRow, cols.adults, bk.adults);
+        _writeCell(ws, writeRow, cols.child, bk.child);
+        _writeCell(ws, writeRow, cols.liability, bk.liability);
+        _writeCell(ws, writeRow, cols.billNo, bk.billNo);
+        _writeCell(ws, writeRow, cols.remarks, bk.remarks);
+        _writeCell(ws, writeRow, cols.staff, bk.staff);
+        writeRow += 1;
+      }
+    });
+    // Unassigned tail (no separator).
+    for (const bk of unassigned) {
+      _clearDataRow(ws, writeRow, cols);
+      _writeCell(ws, writeRow, cols.room, bk.room);
+      _writeCell(ws, writeRow, cols.guest, bk.guest);
+      _writeCell(ws, writeRow, cols.departure, bk.departureRaw && typeof bk.departureRaw === 'string' && !parseDateValue(bk.departureRaw) ? bk.departureRaw : (bk.departure ? toDeparture(bk.departure) : null));
+      _writeCell(ws, writeRow, cols.adults, bk.adults);
+      _writeCell(ws, writeRow, cols.child, bk.child);
+      _writeCell(ws, writeRow, cols.liability, bk.liability);
+      _writeCell(ws, writeRow, cols.billNo, bk.billNo);
+      _writeCell(ws, writeRow, cols.remarks, bk.remarks);
+      _writeCell(ws, writeRow, cols.staff, bk.staff);
+      writeRow += 1;
+    }
+    // Clear leftover rows up to (but not including) the TOTAL row.
+    for (let r = writeRow; r < lay.totalRow; r++) {
+      _clearDataRow(ws, r, cols);
+    }
+  }
+  // One-shot warnings for non-standard formulas.
+  for (const w of warnings) {
+    const sig = `${fileEntry.name}:${w.col}:${w.why}`;
+    if (STATE.warnedSumFormula && STATE.warnedSumFormula.has(sig)) continue;
+    if (STATE.warnedSumFormula) STATE.warnedSumFormula.add(sig);
+    toast(`TOTAL formula on column ${_colA(w.col)} looks non-standard — please verify`, 'error');
+  }
+}
+/* === REBUILD_GROUPINGS_END === */
+
+/* ----- Day-level boat editing (called from the boat strip UI) ----- */
+function _getBoatsForDay(file, sheetName) {
+  return (getSheetMeta(file, sheetName).boats || []).slice();
+}
+function _setBoatsAndAssignments(file, sheetName, boats, assignments) {
+  setSheetMeta(file, sheetName, { boats, assignments });
+  rebuildBookings();
+  updateStatus();
+}
+function cycleAssignment(file, sheetName, booking) {
+  const meta = getSheetMeta(file, sheetName);
+  const boats = (meta.boats || []).slice();
+  if (!boats.length) return;
+  const assignments = { ...(meta.assignments || {}) };
+  const key = boatKey(booking);
+  const current = assignments[key];
+  const order = [null, ...boats.map(b => b.id)];
+  const idx = order.indexOf(current ?? null);
+  const next = order[(idx + 1) % order.length];
+  if (next == null) delete assignments[key];
+  else assignments[key] = next;
+  _setBoatsAndAssignments(file, sheetName, boats, assignments);
+}
+function addBoatToDay(file, sheetName, name, capacity) {
+  const meta = getSheetMeta(file, sheetName);
+  const boats = (meta.boats || []).slice();
+  boats.push({ id: _newBoatId(), name: String(name || '').trim() || `Boat ${boats.length + 1}`, capacity: Number(capacity) || 0 });
+  // Cache in pool.
+  const excKey = excursionKeyFor(file.name);
+  if (excKey) {
+    const cfg = getExcursionConfig(excKey);
+    const lcName = (boats[boats.length - 1].name).toLowerCase();
+    if (!cfg.boatPool.some(n => n.toLowerCase() === lcName)) {
+      cfg.boatPool.push(boats[boats.length - 1].name);
+      saveExcursionConfig();
+    }
+  }
+  _setBoatsAndAssignments(file, sheetName, boats, meta.assignments || {});
+}
+function renameBoatOnDay(file, sheetName, boatId, newName) {
+  const meta = getSheetMeta(file, sheetName);
+  const boats = (meta.boats || []).map(b => b.id === boatId ? { ...b, name: String(newName || b.name) } : b);
+  _setBoatsAndAssignments(file, sheetName, boats, meta.assignments || {});
+}
+function setBoatCapacityOnDay(file, sheetName, boatId, capacity) {
+  const meta = getSheetMeta(file, sheetName);
+  const boats = (meta.boats || []).map(b => b.id === boatId ? { ...b, capacity: Math.max(0, Number(capacity) || 0) } : b);
+  _setBoatsAndAssignments(file, sheetName, boats, meta.assignments || {});
+}
+function removeBoatFromDay(file, sheetName, boatId, reassignToId) {
+  const meta = getSheetMeta(file, sheetName);
+  const boats = (meta.boats || []).filter(b => b.id !== boatId);
+  const assignments = { ...(meta.assignments || {}) };
+  for (const k of Object.keys(assignments)) {
+    if (assignments[k] !== boatId) continue;
+    if (reassignToId) assignments[k] = reassignToId;
+    else delete assignments[k];
+  }
+  _setBoatsAndAssignments(file, sheetName, boats, assignments);
 }
 
 /* ============================================================
@@ -2760,6 +3455,7 @@ async function replayOps(fileEntry, ops) {
           for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
             const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, fileEntry.name, lay, r,
               fileEntry.excursionName, lay.dateISO, lay.capacity, fileEntry.excursionColor, fileEntry);
+            if (b.isSeparator) continue;
             const m = getBookingMeta(fileEntry, sheetEntry.sheetName, r);
             if (b.isEmpty && (m.status === 'active' || !m.status)) { chosen = r; break; }
           }
@@ -2768,6 +3464,20 @@ async function replayOps(fileEntry, ops) {
           if (op.bookingTempId) tempIdToRow.set(op.bookingTempId, row);
         } else if (op.bookingTempId && tempIdToRow.has(op.bookingTempId)) {
           row = tempIdToRow.get(op.bookingTempId);
+        } else if (isMultiBoatFile(fileEntry) && op.fields) {
+          // Multi-boat sheets reshuffle rows on save (rebuildBoatGroupings).
+          // Re-resolve the target row by stable booking key first, fall back
+          // to rowIdx for backwards compatibility.
+          const lay = sheetEntry.layout;
+          const target = boatKey({ room: op.fields.room, guest: op.fields.guest, departure: op.fields.departure });
+          let resolved = -1;
+          for (let r = lay.firstBooking; r <= lay.lastBooking; r++) {
+            const b = readBooking(sheetEntry.ws, sheetEntry.sheetName, fileEntry.name, lay, r,
+              fileEntry.excursionName, lay.dateISO, lay.capacity, fileEntry.excursionColor, fileEntry);
+            if (b.isSeparator || b.isEmpty) continue;
+            if (boatKey(b) === target) { resolved = r; break; }
+          }
+          if (resolved > 0) row = resolved;
         }
         writeBooking(fileEntry, op.sheetName, row, op.fields, {
           isNew: op.isNew, bookingTempId: op.bookingTempId, txnId: op.txnId,
@@ -3496,6 +4206,10 @@ function renderExcursionCard(file, sheet) {
   );
   card.append(head);
 
+  // Boat strip — multi-boat excursions only; null otherwise.
+  const strip = renderBoatStrip(file, sheet);
+  if (strip) card.append(strip);
+
   // Decide which bookings to show
   const showCancelled = STATE.showCancelled;
   const visibleBookings = applyStatusFilter(
@@ -3510,6 +4224,7 @@ function renderExcursionCard(file, sheet) {
         : 'No bookings yet'
     ));
   } else {
+    const multiBoat = isMultiBoatFile(file);
     const tbl = el('table', {class:'exc-table'});
     tbl.append(el('thead', {},
       el('tr', {},
@@ -3517,6 +4232,7 @@ function renderExcursionCard(file, sheet) {
         el('th', {class:'col-room'}, 'Room'),
         el('th', {}, 'Guest'),
         el('th', {class:'num-col col-pax'}, 'Pax'),
+        multiBoat ? el('th', {class:'col-boat'}, 'Boat') : null,
         el('th', {class:'col-status'}, 'Status'),
         el('th', {class:'col-bill'}, 'Bill'),
         el('th', {class:'col-remarks'}, 'Remarks'),
@@ -3533,6 +4249,7 @@ function renderExcursionCard(file, sheet) {
         el('td', {class:'col-room'}, b.room || ''),
         el('td', {class:'col-guest'}, b.guest || ''),
         el('td', {class:'col-pax'}, `${b.adults||0}+${b.child||0}`),
+        multiBoat ? el('td', {class:'col-boat'}, renderBoatChip(file, sheet, b)) : null,
         el('td', {class:'col-status'}, ...renderBookingStatusPills(b)),
         el('td', {class:'col-bill'}, b.billNo || ''),
         el('td', {class:'col-remarks', title: b.remarks || ''}, b.remarks || ''),
@@ -3702,6 +4419,216 @@ function openCapacityPopover(file, sheet, anchorEl) {
     document.addEventListener('mousedown', dismiss);
   }, 30);
   inp.focus(); inp.select();
+}
+
+/* ============================================================
+   Boat strip UI (multi-boat excursions only)
+   - Pills at the top of an excursion card showing each boat's X/Y count.
+   - Per-row chips that cycle Unassigned → Boat 1 → Boat 2 → … on tap.
+   - Hidden entirely when the excursion's multiBoat flag is off.
+   ============================================================ */
+function renderBoatStrip(file, sheet) {
+  if (!isMultiBoatFile(file)) return null;
+  const meta = getSheetMeta(file, sheet.sheetName);
+  const boats = meta.boats || [];
+  const assignments = meta.assignments || {};
+  const bookings = STATE.bookings.filter(b =>
+    b.fileKey === file.name && b.sheetName === sheet.sheetName
+    && (b.status === 'active' || !b.status));
+  const counts = {};
+  boats.forEach(b => { counts[b.id] = 0; });
+  let unassigned = 0;
+  for (const bk of bookings) {
+    const bid = assignments[boatKey(bk)];
+    if (bid && counts[bid] != null) counts[bid] += (bk.adults || 0) + (bk.child || 0);
+    else unassigned += (bk.adults || 0) + (bk.child || 0);
+  }
+
+  const strip = el('div', { class: 'boat-strip', style: {
+    display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 12px',
+    borderBottom: '1px solid var(--line)', alignItems: 'center'
+  } });
+
+  boats.forEach((b, i) => {
+    const filled = counts[b.id] || 0;
+    const cap = b.capacity || 0;
+    const over = cap > 0 && filled > cap;
+    strip.append(el('button', {
+      class: 'boat-pill' + (over ? ' is-over' : ''),
+      title: `Edit ${b.name}`,
+      style: {
+        display: 'inline-flex', alignItems: 'center', gap: '6px',
+        padding: '4px 10px', borderRadius: '14px',
+        background: over ? '#fdecec' : '#eef4f7',
+        color: over ? '#a83232' : '#1B4965',
+        border: '1px solid ' + (over ? '#e09090' : 'transparent'),
+        fontSize: '13px', cursor: 'pointer',
+      },
+      onclick: (e) => { e.stopPropagation(); openBoatEditModal(file, sheet, b.id); },
+    },
+      el('strong', {}, `BOAT ${i + 1}`),
+      el('span', {}, ` ${b.name}`),
+      el('span', { class: 'muted', style: { fontSize: '12px' } }, `${filled}${cap ? '/' + cap : ''} pax`)
+    ));
+  });
+
+  if (unassigned > 0) {
+    strip.append(el('span', {
+      class: 'boat-pill is-unassigned',
+      style: {
+        padding: '4px 10px', borderRadius: '14px',
+        background: '#f5f0e0', color: '#856437', fontSize: '13px',
+      },
+    }, `Unassigned ${unassigned} pax`));
+  }
+
+  strip.append(el('button', {
+    class: 'btn btn-small',
+    style: { marginLeft: 'auto' },
+    onclick: (e) => { e.stopPropagation(); openAddBoatModal(file, sheet); },
+  }, '+ Add boat'));
+
+  return strip;
+}
+
+function renderBoatChip(file, sheet, booking) {
+  if (!isMultiBoatFile(file)) return null;
+  const meta = getSheetMeta(file, sheet.sheetName);
+  const boats = meta.boats || [];
+  if (!boats.length) return null;
+  const assignments = meta.assignments || {};
+  const bid = assignments[boatKey(booking)];
+  const boat = boats.find(b => b.id === bid);
+  const idx = boats.findIndex(b => b.id === bid);
+  const label = boat ? `BOAT ${idx + 1}` : '—';
+  return el('button', {
+    class: 'boat-chip' + (boat ? ' is-assigned' : ' is-unassigned'),
+    title: boat ? `${boat.name} — tap to change` : 'Unassigned — tap to assign',
+    style: {
+      display: 'inline-block', padding: '2px 8px', borderRadius: '10px',
+      background: boat ? '#eef4f7' : '#f1ede4',
+      color: boat ? '#1B4965' : '#856437',
+      border: 'none', fontSize: '12px', cursor: 'pointer',
+    },
+    onclick: (e) => { e.stopPropagation(); cycleAssignment(file, sheet.sheetName, booking); renderView(); },
+  }, label);
+}
+
+function openAddBoatModal(file, sheet) {
+  const excKey = excursionKeyFor(file.name);
+  const cfg = excKey ? getExcursionConfig(excKey) : { boatPool: [] };
+  const meta = getSheetMeta(file, sheet.sheetName);
+  const usedNames = new Set((meta.boats || []).map(b => (b.name || '').toLowerCase()));
+  const available = (cfg.boatPool || []).filter(n => !usedNames.has(n.toLowerCase()));
+
+  const nameInp = el('input', { type: 'text', placeholder: 'New boat name', style: { width: '100%' } });
+  const capInp = el('input', { type: 'number', min: '0', value: String(cfg.maxPax && cfg.defaultBoatCount ? Math.floor(cfg.maxPax / Math.max(1, cfg.defaultBoatCount)) : 0), style: { width: '90px' } });
+
+  const body = el('div', { style: { maxWidth: '420px' } },
+    el('h2', {}, 'Add boat'),
+    el('p', { class: 'muted', style: { fontSize: '13px', margin: '0 0 12px' } },
+      `Adds a boat to ${sheet.sheetName} only. Names also save to the pool for next time.`),
+    available.length ? el('div', { style: { marginBottom: '10px' } },
+      el('div', { class: 'muted', style: { fontSize: '12px', marginBottom: '4px' } }, 'From pool'),
+      el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+        ...available.map(name => el('button', {
+          class: 'pill', style: { cursor: 'pointer' },
+          onclick: () => { nameInp.value = name; nameInp.focus(); }
+        }, name))
+      )
+    ) : null,
+    el('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', marginTop: '6px' } },
+      el('label', {}, el('div', { class: 'muted', style: { fontSize: '12px' } }, 'Name'), nameInp),
+      el('label', {}, el('div', { class: 'muted', style: { fontSize: '12px' } }, 'Capacity'), capInp),
+    ),
+    el('div', { class: 'foot', style: { display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' } },
+      el('button', { class: 'btn', onclick: closeModal }, 'Cancel'),
+      el('button', { class: 'btn btn-primary', onclick: () => {
+        const name = String(nameInp.value || '').trim();
+        if (!name) { nameInp.focus(); return; }
+        addBoatToDay(file, sheet.sheetName, name, Number(capInp.value) || 0);
+        closeModal();
+        renderView();
+      } }, 'Add'),
+    )
+  );
+  openModal(body);
+}
+
+function openBoatEditModal(file, sheet, boatId) {
+  const meta = getSheetMeta(file, sheet.sheetName);
+  const boat = (meta.boats || []).find(b => b.id === boatId);
+  if (!boat) return;
+  const assigned = Object.entries(meta.assignments || {}).filter(([_, id]) => id === boatId).length;
+
+  const nameInp = el('input', { type: 'text', value: boat.name || '', style: { width: '100%' } });
+  const capInp = el('input', { type: 'number', min: '0', value: String(boat.capacity || 0), style: { width: '90px' } });
+
+  const body = el('div', { style: { maxWidth: '440px' } },
+    el('h2', {}, `Edit boat`),
+    el('p', { class: 'muted', style: { fontSize: '13px', margin: '0 0 12px' } },
+      `${assigned} booking${assigned === 1 ? '' : 's'} currently assigned.`),
+    el('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' } },
+      el('label', {}, el('div', { class: 'muted', style: { fontSize: '12px' } }, 'Name'), nameInp),
+      el('label', {}, el('div', { class: 'muted', style: { fontSize: '12px' } }, 'Capacity'), capInp),
+    ),
+    el('div', { class: 'foot', style: { display: 'flex', justifyContent: 'space-between', marginTop: '14px' } },
+      el('button', {
+        class: 'btn btn-link-danger',
+        onclick: () => {
+          closeModal();
+          if (assigned > 0) openRemoveBoatModal(file, sheet, boatId);
+          else removeBoatFromDay(file, sheet.sheetName, boatId, null);
+          renderView();
+        }
+      }, 'Remove boat'),
+      el('div', { style: { display: 'flex', gap: '8px' } },
+        el('button', { class: 'btn', onclick: closeModal }, 'Cancel'),
+        el('button', { class: 'btn btn-primary', onclick: () => {
+          renameBoatOnDay(file, sheet.sheetName, boatId, String(nameInp.value || boat.name));
+          setBoatCapacityOnDay(file, sheet.sheetName, boatId, Number(capInp.value) || 0);
+          closeModal();
+          renderView();
+        } }, 'Save'),
+      )
+    )
+  );
+  openModal(body);
+}
+
+function openRemoveBoatModal(file, sheet, boatId) {
+  const meta = getSheetMeta(file, sheet.sheetName);
+  const boat = (meta.boats || []).find(b => b.id === boatId);
+  if (!boat) return;
+  const others = (meta.boats || []).filter(b => b.id !== boatId);
+  const assignedKeys = Object.entries(meta.assignments || {}).filter(([_, id]) => id === boatId).map(([k]) => k);
+
+  let targetId = others[0] ? others[0].id : '';
+  const radios = el('div', { style: { display: 'grid', gap: '6px' } },
+    ...others.map(b => el('label', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      el('input', { type: 'radio', name: 'reassign', value: b.id, checked: b.id === targetId, onchange: (e) => { targetId = e.target.value; } }),
+      b.name
+    )),
+    el('label', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      el('input', { type: 'radio', name: 'reassign', value: '', onchange: (e) => { targetId = ''; } }),
+      'Unassigned')
+  );
+
+  const body = el('div', { style: { maxWidth: '440px' } },
+    el('h2', {}, `Remove ${boat.name}`),
+    el('p', { class: 'muted', style: { fontSize: '13px', margin: '0 0 12px' } },
+      `${assignedKeys.length} booking${assignedKeys.length === 1 ? ' is' : 's are'} on this boat. Where should they go?`),
+    radios,
+    el('div', { class: 'foot', style: { display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' } },
+      el('button', { class: 'btn', onclick: closeModal }, 'Cancel'),
+      el('button', { class: 'btn btn-primary', onclick: () => {
+        removeBoatFromDay(file, sheet.sheetName, boatId, targetId || null);
+        closeModal();
+        renderView();
+      } }, 'Reassign & remove'),
+    )
+  );
+  openModal(body);
 }
 
 /* ============================================================
@@ -5412,6 +6339,8 @@ $('#btn-save').addEventListener('click', saveAll);
 $('#btn-reload').addEventListener('click', reload);
 $('#btn-inhouse').addEventListener('click', openInhouseModal);
 $('#user-chip').addEventListener('click', () => { promptForUserId(); });
+$('#btn-settings').addEventListener('click', openExcursionSettingsModal);
+loadExcursionConfig();
 
 $$('.seg-btn').forEach(btn => btn.addEventListener('click', ()=>{
   $$('.seg-btn').forEach(b=>b.classList.remove('is-active'));
