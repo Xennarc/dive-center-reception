@@ -1012,6 +1012,10 @@ animation: spin .6s linear infinite;
 .exc-table tr.row-cancelled td:not(.col-status) { color: var(--muted); text-decoration: line-through; }
 .exc-table tr.row-postponed  td:not(.col-status) { color: var(--muted); font-style: italic; }
 .exc-table tr.row-cancelled, .exc-table tr.row-postponed { opacity: 0.78; }
+.exc-table tr.row-bulk-selected { background: #e8f0f5; }
+.exc-table tr.row-bulk-selected:hover { background: #dbe7ee; }
+.exc-table td.col-bulk, .exc-table th.col-bulk { width: 28px; text-align: center; padding-left: 6px; padding-right: 4px; }
+.exc-table td.col-bulk input[type="checkbox"], .exc-table th.col-bulk input[type="checkbox"] { cursor: pointer; }
 
 /* Activity-cancelled banner on excursion card */
 .exc-card.is-day-cancelled { border-color: rgba(196, 83, 60, 0.5); }
@@ -1290,6 +1294,8 @@ const STATE = {
   saving: new Set(),         // filenames currently mid-save (poller skips these)
   excursionConfig: null,     // { excursions: { <key>: { multiBoat, maxPax, boatPool[], defaultBoatCount } } } — mirrors localStorage['reefdesk:excursionConfig']
   warnedSumFormula: new Set(),// one-shot toast guard for non-standard TOTAL formulas
+  bulkSelection: new Set(),  // boatKey(booking) strings for the active bulk-assign selection
+  bulkSelectionKey: null,    // "<fileName>::<sheetName>" — scopes selection to one card; clears when scope changes
 };
 
 const PALETTE = ['#1B4965','#3D6975','#4A7C59','#856437','#A85A4A','#5E5081','#9C7A2C','#3A7866','#6B5070','#7A4E3A'];
@@ -2879,6 +2885,78 @@ function cycleAssignment(file, sheetName, booking) {
   else assignments[key] = next;
   _setBoatsAndAssignments(file, sheetName, boats, assignments);
 }
+/* === BULK_ASSIGN_BEGIN === */
+function bulkAssignToBoat(file, sheetName, bookingKeys, boatId) {
+  // Move every booking whose boatKey is in `bookingKeys` onto boatId in
+  // one shot. boatId === null clears the assignment. Validates that the
+  // target boat exists; throws on unknown boatId so callers can't silently
+  // create dangling assignment entries that validateAssignments would reject.
+  const meta = getSheetMeta(file, sheetName);
+  const boats = (meta.boats || []).slice();
+  if (boatId != null && !boats.some(b => b.id === boatId)) {
+    throw new Error(`bulkAssignToBoat: unknown boatId ${boatId}`);
+  }
+  const assignments = { ...(meta.assignments || {}) };
+  let changed = 0;
+  for (const key of bookingKeys) {
+    if (boatId == null) {
+      if (key in assignments) { delete assignments[key]; changed++; }
+    } else if (assignments[key] !== boatId) {
+      assignments[key] = boatId;
+      changed++;
+    }
+  }
+  if (!changed) return 0;
+  _setBoatsAndAssignments(file, sheetName, boats, assignments);
+  return changed;
+}
+/* === BULK_ASSIGN_END === */
+
+/* ----- Bulk-selection state (UI only — never persisted) ----- */
+function _bulkScopeKey(file, sheetName) { return `${file.name}::${sheetName}`; }
+function clearBulkSelection() {
+  if (STATE.bulkSelection.size === 0 && STATE.bulkSelectionKey == null) return;
+  STATE.bulkSelection.clear();
+  STATE.bulkSelectionKey = null;
+}
+function _ensureBulkScope(file, sheetName) {
+  const scope = _bulkScopeKey(file, sheetName);
+  if (STATE.bulkSelectionKey !== scope) {
+    STATE.bulkSelection.clear();
+    STATE.bulkSelectionKey = scope;
+  }
+}
+function toggleBulkSelection(file, sheetName, booking) {
+  _ensureBulkScope(file, sheetName);
+  const key = boatKey(booking);
+  if (STATE.bulkSelection.has(key)) STATE.bulkSelection.delete(key);
+  else STATE.bulkSelection.add(key);
+  if (STATE.bulkSelection.size === 0) STATE.bulkSelectionKey = null;
+}
+function selectAllUnassigned(file, sheet) {
+  _ensureBulkScope(file, sheet.sheetName);
+  const meta = getSheetMeta(file, sheet.sheetName);
+  const assignments = meta.assignments || {};
+  for (const b of STATE.bookings) {
+    if (b.fileKey !== file.name || b.sheetName !== sheet.sheetName) continue;
+    if (b.status === 'cancelled' || b.status === 'postponed') continue;
+    const k = boatKey(b);
+    if (!assignments[k]) STATE.bulkSelection.add(k);
+  }
+  if (STATE.bulkSelection.size === 0) STATE.bulkSelectionKey = null;
+}
+function selectAllOnCard(file, sheet, on) {
+  _ensureBulkScope(file, sheet.sheetName);
+  const showCancelled = STATE.showCancelled;
+  for (const b of STATE.bookings) {
+    if (b.fileKey !== file.name || b.sheetName !== sheet.sheetName) continue;
+    if (!showCancelled && (b.status === 'cancelled' || b.status === 'postponed')) continue;
+    const k = boatKey(b);
+    if (on) STATE.bulkSelection.add(k);
+    else STATE.bulkSelection.delete(k);
+  }
+  if (STATE.bulkSelection.size === 0) STATE.bulkSelectionKey = null;
+}
 function addBoatToDay(file, sheetName, name, capacity) {
   const meta = getSheetMeta(file, sheetName);
   const boats = (meta.boats || []).slice();
@@ -3871,7 +3949,7 @@ function renderDateStrip() {
         (isMonthStart ? ' month-divider' : ''),
       'data-date': d,
       ...(isMonthStart ? {'data-month': fmtMonth(d)} : {}),
-      onclick: () => { STATE.selectedDate = d; renderDateStrip(); renderView(); }
+      onclick: () => { STATE.selectedDate = d; clearBulkSelection(); renderDateStrip(); renderView(); }
     },
       el('div', {class: 'dow'}, dow),
       el('div', {class: 'day'}, String(D)),
@@ -3893,10 +3971,80 @@ function renderView() {
   const c = $('#view-container');
   c.innerHTML = '';
   // Search overrides everything
-  if (STATE.search.trim()) { c.append(renderSearchResults()); return; }
-  if (STATE.view === 'people') { c.append(renderPeople()); return; }
-  if (STATE.view === 'stats') { c.append(renderStats()); return; }
-  c.append(renderAgenda());
+  if (STATE.search.trim()) { c.append(renderSearchResults()); }
+  else if (STATE.view === 'people') { c.append(renderPeople()); }
+  else if (STATE.view === 'stats') { c.append(renderStats()); }
+  else c.append(renderAgenda());
+  renderBulkActionBar();
+}
+
+function renderBulkActionBar() {
+  // Remove any prior bar — replaced on every render.
+  const prior = document.getElementById('bulk-action-bar');
+  if (prior) prior.remove();
+  if (STATE.bulkSelection.size === 0 || !STATE.bulkSelectionKey) return;
+  // Resolve the scoped file/sheet.
+  const [fileName, sheetName] = STATE.bulkSelectionKey.split('::');
+  const file = STATE.files.find(f => f.name === fileName);
+  if (!file) { clearBulkSelection(); return; }
+  const sheet = file.sheets.find(s => s.sheetName === sheetName);
+  if (!sheet) { clearBulkSelection(); return; }
+  const meta = getSheetMeta(file, sheetName);
+  const boats = meta.boats || [];
+  if (!boats.length) { clearBulkSelection(); return; }
+
+  const sel = el('select', { style: { padding: '6px 8px', borderRadius: '6px', fontSize: '14px' } },
+    ...boats.map((b, i) => el('option', { value: b.id }, `BOAT ${i + 1} · ${b.name}`)),
+    el('option', { value: '__unassign' }, 'Unassigned')
+  );
+
+  const apply = () => {
+    const v = sel.value;
+    const boatId = v === '__unassign' ? null : v;
+    const keys = Array.from(STATE.bulkSelection);
+    let changed = 0;
+    try {
+      changed = bulkAssignToBoat(file, sheetName, keys, boatId);
+    } catch (e) {
+      toast(e.message || 'Bulk assign failed', 'error');
+      return;
+    }
+    clearBulkSelection();
+    if (changed) {
+      const label = boatId == null ? 'Unassigned' : (boats.find(b => b.id === boatId) || {}).name || 'boat';
+      toast(`Moved ${changed} booking${changed === 1 ? '' : 's'} → ${label}`, 'success');
+    }
+    renderView();
+  };
+
+  const bar = el('div', {
+    id: 'bulk-action-bar',
+    style: {
+      position: 'fixed', left: '50%', bottom: '18px', transform: 'translateX(-50%)',
+      background: '#1B4965', color: '#fff',
+      padding: '10px 14px', borderRadius: '10px',
+      boxShadow: '0 6px 24px rgba(0,0,0,0.18)',
+      display: 'flex', alignItems: 'center', gap: '10px',
+      fontSize: '14px', zIndex: '60',
+      maxWidth: 'calc(100vw - 24px)', flexWrap: 'wrap', justifyContent: 'center',
+    },
+  },
+    el('strong', {}, `${STATE.bulkSelection.size} selected`),
+    el('span', { class: 'muted', style: { color: '#cfe0ea', fontSize: '12px' } }, `${file.excursionName} · ${sheet.sheetName}`),
+    el('span', { style: { color: '#cfe0ea' } }, '→'),
+    sel,
+    el('button', {
+      class: 'btn btn-primary btn-small',
+      style: { background: '#fff', color: '#1B4965' },
+      onclick: apply,
+    }, 'Apply'),
+    el('button', {
+      class: 'btn btn-small',
+      style: { background: 'transparent', color: '#fff', border: '1px solid #cfe0ea' },
+      onclick: () => { clearBulkSelection(); renderView(); },
+    }, 'Clear'),
+  );
+  document.body.appendChild(bar);
 }
 
 /* ============================================================
@@ -4060,9 +4208,29 @@ function renderExcursionCard(file, sheet) {
     ));
   } else {
     const multiBoat = isMultiBoatFile(file);
+    const sheetMetaForCard = getSheetMeta(file, sheet.sheetName);
+    const boatsForCard = sheetMetaForCard.boats || [];
+    const showBulkCol = multiBoat && boatsForCard.length > 0;
+    const scopeKey = `${file.name}::${sheet.sheetName}`;
+    const selectionActiveOnCard = showBulkCol && STATE.bulkSelectionKey === scopeKey;
     const tbl = el('table', {class:'exc-table'});
+    const masterChk = showBulkCol ? el('input', {
+      type: 'checkbox',
+      title: 'Select all on this card',
+      onclick: (e) => {
+        e.stopPropagation();
+        selectAllOnCard(file, sheet, e.target.checked);
+        renderView();
+      },
+    }) : null;
+    if (masterChk) {
+      const allKeysOnCard = visibleBookings.map(b => boatKey(b));
+      masterChk.checked = selectionActiveOnCard && allKeysOnCard.length > 0
+        && allKeysOnCard.every(k => STATE.bulkSelection.has(k));
+    }
     tbl.append(el('thead', {},
       el('tr', {},
+        showBulkCol ? el('th', {class:'col-bulk', style:{width:'28px'}}, masterChk) : null,
         el('th', {class:'col-slot'}, '#'),
         el('th', {class:'col-room'}, 'Room'),
         el('th', {}, 'Guest'),
@@ -4079,7 +4247,20 @@ function renderExcursionCard(file, sheet) {
       const rowCls = [];
       if (b.status === 'cancelled') rowCls.push('row-cancelled');
       if (b.status === 'postponed') rowCls.push('row-postponed');
+      const bk = showBulkCol ? boatKey(b) : null;
+      const isSelected = bk != null && selectionActiveOnCard && STATE.bulkSelection.has(bk);
+      if (isSelected) rowCls.push('row-bulk-selected');
+      const rowChk = showBulkCol ? el('input', {
+        type: 'checkbox',
+        onclick: (e) => {
+          e.stopPropagation();
+          toggleBulkSelection(file, sheet.sheetName, b);
+          renderView();
+        },
+      }) : null;
+      if (rowChk) rowChk.checked = isSelected;
       body.append(el('tr', { class: rowCls.join(' '), onclick: () => openEditModal(b) },
+        showBulkCol ? el('td', {class:'col-bulk', onclick:(e)=>e.stopPropagation()}, rowChk) : null,
         el('td', {class:'col-slot'}, String(b.slot || '')),
         el('td', {class:'col-room'}, b.room || ''),
         el('td', {class:'col-guest'}, b.guest || ''),
@@ -4302,6 +4483,18 @@ function renderBoatStrip(file, sheet) {
         background: '#f5f0e0', color: '#856437', fontSize: '13px',
       },
     }, `Unassigned ${unassigned} pax`));
+    if (boats.length > 0) {
+      strip.append(el('button', {
+        class: 'boat-pill',
+        title: 'Select all unassigned guests for bulk assignment',
+        style: {
+          padding: '3px 9px', borderRadius: '12px',
+          background: '#eef4f7', color: '#1B4965',
+          border: '1px dashed #1B4965', fontSize: '12px', cursor: 'pointer',
+        },
+        onclick: (e) => { e.stopPropagation(); selectAllUnassigned(file, sheet); renderView(); },
+      }, 'Select unassigned'));
+    }
   }
 
   strip.append(el('button', {
@@ -6133,6 +6326,7 @@ $$('.seg-btn').forEach(btn => btn.addEventListener('click', ()=>{
   $$('.seg-btn').forEach(b=>b.classList.remove('is-active'));
   btn.classList.add('is-active');
   STATE.view = btn.dataset.mode;
+  clearBulkSelection();
   // Date strip is only relevant in agenda mode without an active search
   $('#subhead').style.display = (STATE.view === 'agenda' && !STATE.search.trim()) ? '' : 'none';
   renderView();
@@ -6140,6 +6334,7 @@ $$('.seg-btn').forEach(btn => btn.addEventListener('click', ()=>{
 
 $('#filter-excursion').addEventListener('change', e => {
   STATE.excFilter = e.target.value;
+  clearBulkSelection();
   renderDateStrip();
   renderView();
 });
@@ -6148,6 +6343,7 @@ const searchInput = $('#search');
 const searchClear = $('#search-clear');
 searchInput.addEventListener('input', e => {
   STATE.search = e.target.value;
+  clearBulkSelection();
   searchClear.classList.toggle('is-visible', !!STATE.search.trim());
   $('#subhead').style.display = (STATE.view === 'agenda' && !STATE.search.trim()) ? '' : 'none';
   renderView();
@@ -6155,6 +6351,7 @@ searchInput.addEventListener('input', e => {
 searchClear.addEventListener('click', () => {
   searchInput.value = '';
   STATE.search = '';
+  clearBulkSelection();
   searchClear.classList.remove('is-visible');
   $('#subhead').style.display = STATE.view === 'agenda' ? '' : 'none';
   renderView();
@@ -6167,6 +6364,7 @@ $('#btn-today').addEventListener('click', () => {
   const t = todayISO();
   const all = uniqueDates();
   STATE.selectedDate = all.includes(t) ? t : (all.find(d => d >= t) || all[0]);
+  clearBulkSelection();
   renderDateStrip(); renderView();
 });
 
@@ -6175,6 +6373,7 @@ function moveSelectedDate(delta) {
   const idx = all.indexOf(STATE.selectedDate);
   const next = Math.max(0, Math.min(all.length-1, idx + delta));
   STATE.selectedDate = all[next];
+  clearBulkSelection();
   renderDateStrip(); renderView();
 }
 
