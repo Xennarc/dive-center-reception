@@ -23,6 +23,7 @@ const ExcelJS = require('exceljs');
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 
 const HTML_PATH = path.join(__dirname, 'sheet-shaper.html');
+const ENGINE_PATH = path.join(__dirname, 'Booking engine v5.html');
 
 // ---------------------------------------------------------------------------
 // Step 1: extract production code from sheet-shaper.html (no duplication)
@@ -479,7 +480,317 @@ async function main() {
   console.log('\nAll assertions passed.');
 }
 
-main().catch(e => {
-  console.error('\nTEST FAILED:', e && e.stack ? e.stack : e);
-  process.exit(1);
-});
+// ---------------------------------------------------------------------------
+// Step 5: multi-boat helpers extracted from Booking engine v5.html
+// ---------------------------------------------------------------------------
+
+function loadBoatHelpers() {
+  const html = fs.readFileSync(ENGINE_PATH, 'utf8');
+  const boatInfer = extractBlock(html, /\/\* === BOAT_INFER_BEGIN === \*\//, /\/\* === BOAT_INFER_END === \*\//);
+  const ensureCap = extractBlock(html, /\/\* === ENSURE_CAPACITY_BEGIN === \*\//, /\/\* === ENSURE_CAPACITY_END === \*\//);
+  const rebuild   = extractBlock(html, /\/\* === REBUILD_GROUPINGS_BEGIN === \*\//, /\/\* === REBUILD_GROUPINGS_END === \*\//);
+
+  // Stubs for v5 helpers the extracted code calls. Kept minimal — these
+  // are tiny utilities; their browser-side definitions are not under test.
+  const stubs = `
+    function cellRaw(cell) {
+      if (!cell) return null;
+      const v = cell.value;
+      if (v == null) return null;
+      if (v instanceof Date) return v;
+      if (typeof v === 'object' && 'result' in v) return v.result;
+      if (typeof v === 'object' && 'text' in v) return v.text;
+      if (typeof v === 'object' && 'richText' in v) return v.richText.map(r => r.text).join('');
+      return v;
+    }
+    function cellStr(cell) {
+      const v = cellRaw(cell);
+      if (v == null) return '';
+      return String(v).trim();
+    }
+    function parseDateValue(v) {
+      if (!v) return null;
+      if (v instanceof Date) {
+        const yy = v.getFullYear(), mm = String(v.getMonth()+1).padStart(2,'0'), dd = String(v.getDate()).padStart(2,'0');
+        return yy + '-' + mm + '-' + dd;
+      }
+      if (typeof v === 'string') {
+        const m = v.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+        if (m) return m[1] + '-' + m[2] + '-' + m[3];
+      }
+      return null;
+    }
+    function toDeparture(s) {
+      if (!s) return null;
+      const iso = parseDateValue(s);
+      if (iso) { const [y,m,d] = iso.split('-').map(Number); return new Date(y, m-1, d); }
+      return s;
+    }
+    function readBooking(ws, sheetName, fileKey, layout, rowIdx) {
+      // Minimal reader for ensureCapacity / rebuildBoatGroupings tests.
+      const row = ws.getRow(rowIdx);
+      const cols = layout.layout;
+      const at = (c) => c == null ? null : row.getCell(c);
+      const room = cellStr(at(cols.room));
+      const guest = cellStr(at(cols.guest));
+      const departureRaw = cellRaw(at(cols.departure));
+      const departure = parseDateValue(departureRaw);
+      const adults = (() => { const v = cellRaw(at(cols.adults)); return v == null || v === '' ? null : Number(v); })();
+      const child = (() => { const v = cellRaw(at(cols.child)); return v == null || v === '' ? null : Number(v); })();
+      const liability = cellStr(at(cols.liability));
+      const billNo = cellStr(at(cols.billNo));
+      const remarks = cellStr(at(cols.remarks));
+      const staff = cellStr(at(cols.staff));
+      const isEmpty = !room && !guest && adults == null && child == null && !liability && !billNo && !remarks && !staff && !departureRaw;
+      const depStr = typeof departureRaw === 'string' ? departureRaw : '';
+      const isSeparator = !room && /^\\s*BOAT\\s*\\d+\\s*$/i.test(depStr) && !!guest;
+      return { fileKey, sheetName, rowIdx, room, guest, departure, departureRaw, adults, child, liability, billNo, remarks, staff, isEmpty, isSeparator };
+    }
+    // Used by rebuildBoatGroupings → getSheetMeta(file, name). Returns the
+    // map entry the test seeds onto fileEntry.sheetMeta.
+    function getSheetMeta(fileEntry, sheetName) {
+      const stored = (fileEntry && fileEntry.sheetMeta && fileEntry.sheetMeta.get(sheetName)) || {};
+      return Object.assign({ boats: [], assignments: {} }, stored);
+    }
+    function setSheetMeta(fileEntry, sheetName, partial) {
+      if (!fileEntry.sheetMeta) fileEntry.sheetMeta = new Map();
+      const existing = fileEntry.sheetMeta.get(sheetName) || {};
+      fileEntry.sheetMeta.set(sheetName, Object.assign({}, existing, partial));
+      fileEntry.dirty = true;
+    }
+    function isMultiBoatFile(fileEntry) { return fileEntry && fileEntry.__multiBoat === true; }
+    function rebuildBookings() {}
+    function updateStatus() {}
+    function recordOp() {}
+    function excursionKeyFor() { return null; }
+    function getExcursionConfig() { return { boatPool: [] }; }
+    function saveExcursionConfig() {}
+    function toast(msg, kind) { (collectedToasts.push({ msg, kind })); }
+    const collectedToasts = [];
+    const STATE = { warnedSumFormula: new Set(), files: [], bookings: [] };
+  `;
+
+  const sandbox = { console };
+  vm.createContext(sandbox);
+  vm.runInContext(stubs + '\n' + boatInfer + '\n' + ensureCap + '\n' + rebuild + '\n', sandbox, { filename: 'engine-extracted.js' });
+  if (typeof sandbox.inferBoatsFromSheet !== 'function') throw new Error('inferBoatsFromSheet missing');
+  if (typeof sandbox.ensureCapacity !== 'function') throw new Error('ensureCapacity missing');
+  if (typeof sandbox.rebuildBoatGroupings !== 'function') throw new Error('rebuildBoatGroupings missing');
+  return sandbox;
+}
+
+async function testBoatInference(ctx) {
+  // Build a Sunset-Dolphin-shaped sheet: headerRow 6, firstData 8, total at 18.
+  // Cols: room=4, guest=5, departure=6, adults=7, child=8.
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('01');
+  ws.getRow(6).getCell(4).value = 'Room';
+  ws.getRow(6).getCell(5).value = 'Guest';
+  ws.getRow(6).getCell(6).value = 'Departure';
+  // BOAT 1 separator at row 7 (but firstData is 8, separator lives inside data range)
+  // Per the real Sunset Dolphin layout: separator at row 7, data starts at row 8.
+  ws.getRow(7).getCell(5).value = 'SHADHA';
+  ws.getRow(7).getCell(6).value = 'BOAT 1';
+  ws.getRow(8).getCell(4).value = '101'; ws.getRow(8).getCell(5).value = 'Alice'; ws.getRow(8).getCell(6).value = '2026-05-10';
+  ws.getRow(9).getCell(4).value = '102'; ws.getRow(9).getCell(5).value = 'Bob';   ws.getRow(9).getCell(6).value = '2026-05-10';
+  // BOAT 2 separator at row 13, data at 14-15
+  ws.getRow(13).getCell(5).value = 'BAAZ';
+  ws.getRow(13).getCell(6).value = 'BOAT 2';
+  ws.getRow(14).getCell(4).value = '201'; ws.getRow(14).getCell(5).value = 'Cara'; ws.getRow(14).getCell(6).value = '2026-05-10';
+  ws.getRow(15).getCell(4).value = '202'; ws.getRow(15).getCell(5).value = 'Dan';  ws.getRow(15).getCell(6).value = '2026-05-10';
+  ws.getRow(18).getCell(6).value = 'TOTAL';
+
+  const layout = {
+    headerRow: 6, firstBooking: 7, lastBooking: 17, totalRow: 18, totalMarkerCol: 6,
+    layout: { room: 4, guest: 5, departure: 6, adults: 7, child: 8 },
+  };
+  const result = ctx.inferBoatsFromSheet(ws, layout);
+  assert.strictEqual(result.boats.length, 2, `expected 2 boats, got ${result.boats.length}`);
+  assert.strictEqual(result.boats[0].name, 'SHADHA');
+  assert.strictEqual(result.boats[1].name, 'BAAZ');
+  assert.ok(result.boats[0].id && result.boats[0].id.startsWith('b-'), 'boat ids should be prefixed');
+  // Each booking row should map to a boat
+  const assigned = Object.values(result.assignments);
+  assert.strictEqual(assigned.length, 4, `expected 4 assignments, got ${assigned.length}`);
+  assert.ok(assigned.filter(id => id === result.boats[0].id).length === 2, 'Alice + Bob → BOAT 1');
+  assert.ok(assigned.filter(id => id === result.boats[1].id).length === 2, 'Cara + Dan → BOAT 2');
+  console.log('  · separator inference OK');
+}
+
+async function testEnsureCapacity(ctx) {
+  // 10-row data range (rows 7..16), TOTAL at row 17 with SUM(C7:C16) on col 5 (adults).
+  // Style the last data row with a bold font + thick bottom border + yellow fill +
+  // number format; assert each inserted row receives that style.
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('test');
+  ws.getRow(6).getCell(2).value = 'Room';
+  ws.getRow(6).getCell(3).value = 'Guest';
+  ws.getRow(6).getCell(4).value = 'Departure';
+  ws.getRow(6).getCell(5).value = 'Adults';
+  // Style row 16 (last data row) — these styles must clone onto inserted rows.
+  const styleSrc = ws.getRow(16);
+  for (let c = 2; c <= 5; c++) {
+    const cell = styleSrc.getCell(c);
+    cell.font = { bold: true };
+    cell.border = { bottom: { style: 'thick', color: { argb: 'FF000000' } } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    cell.numFmt = '#,##0.00';
+  }
+  styleSrc.height = 22;
+  // TOTAL row
+  ws.getRow(17).getCell(4).value = 'TOTAL';
+  ws.getRow(17).getCell(5).value = { formula: 'SUM(E7:E16)', result: 0 };
+  // Add a non-standard formula on column 6 to verify it's NOT touched.
+  ws.getRow(17).getCell(6).value = { formula: 'SUM(F7:F16)/2', result: 0 };
+
+  const layout = {
+    headerRow: 6, firstBooking: 7, lastBooking: 16, totalRow: 17, totalMarkerCol: 4,
+    layout: { room: 2, guest: 3, departure: 4, adults: 5 },
+  };
+  // Need 14 data rows → 4 inserts.
+  const warnings = [];
+  const newTotal = ctx.ensureCapacity(ws, 14, layout, warnings);
+  assert.strictEqual(newTotal, 21, `TOTAL should move to row 21, got ${newTotal}`);
+  assert.strictEqual(layout.totalRow, 21, 'layout.totalRow should be mutated');
+  // Sum on column 5 (E) should now span E7:E20
+  const sumCell = ws.getRow(21).getCell(5).value;
+  assert.ok(sumCell && sumCell.formula === 'SUM(E7:E20)', `expected SUM(E7:E20), got ${JSON.stringify(sumCell)}`);
+  // Non-standard formula on column 6 should be untouched
+  const nonStdCell = ws.getRow(21).getCell(6).value;
+  assert.ok(nonStdCell && nonStdCell.formula === 'SUM(F7:F16)/2', `non-standard formula was rewritten: ${JSON.stringify(nonStdCell)}`);
+  // Warnings recorded
+  assert.ok(warnings.some(w => w.col === 6 && w.why === 'non-standard'),
+    'expected a non-standard warning for column 6');
+  // Each inserted row carries the style template
+  for (let r = 17; r <= 20; r++) {
+    const cell = ws.getRow(r).getCell(5);
+    assert.ok(cell.font && cell.font.bold === true, `row ${r} col 5 lost bold`);
+    assert.ok(cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb === 'FFFFFF00', `row ${r} col 5 lost fill`);
+    assert.strictEqual(cell.numFmt, '#,##0.00', `row ${r} col 5 lost numFmt`);
+    assert.ok(cell.border && cell.border.bottom && cell.border.bottom.style === 'thick', `row ${r} col 5 lost border`);
+  }
+  // No-op when requiredRows <= currentRows
+  const layout2 = { ...layout, totalRow: 21, lastBooking: 20, layout: layout.layout };
+  const same = ctx.ensureCapacity(ws, 5, layout2, []);
+  assert.strictEqual(same, 21, 'ensureCapacity should be a no-op when capacity is sufficient');
+  console.log('  · ensureCapacity + style cloning + SUM rewrite OK');
+}
+
+async function testValidateAssignments(ctx) {
+  const ok = ctx.validateAssignments({
+    boats: [{ id: 'b-1', name: 'X' }, { id: 'b-2', name: 'Y' }],
+    assignments: { '101|Alice|2026-05-10': 'b-1', '102|Bob|2026-05-10': 'b-2' },
+  });
+  assert.strictEqual(ok.length, 0, `valid input should produce no errors, got ${JSON.stringify(ok)}`);
+
+  const bad = ctx.validateAssignments({
+    boats: [{ id: 'b-1', name: 'X' }],
+    assignments: { '101|Alice|2026-05-10': 'b-99' },
+  });
+  assert.strictEqual(bad.length, 1, 'unknown boatId should produce 1 error');
+  assert.ok(bad[0].why.includes('unknown boatId'), `error message mismatch: ${bad[0].why}`);
+  console.log('  · validateAssignments OK');
+}
+
+async function testRebuildBoatGroupings(ctx) {
+  // Build a multi-boat sheet, place bookings in scrambled order, run
+  // rebuildBoatGroupings, and assert the on-sheet layout is grouped +
+  // deterministic across two runs.
+  function buildSheet() {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('01');
+    ws.getRow(6).getCell(4).value = 'Room';
+    ws.getRow(6).getCell(5).value = 'Guest';
+    ws.getRow(6).getCell(6).value = 'Departure';
+    ws.getRow(6).getCell(7).value = 'Adults';
+    // Pre-seed 4 bookings on data rows 8..11 in scrambled order.
+    ws.getRow(8).getCell(4).value = '101'; ws.getRow(8).getCell(5).value = 'Alice'; ws.getRow(8).getCell(6).value = '2026-05-10'; ws.getRow(8).getCell(7).value = 2;
+    ws.getRow(9).getCell(4).value = '102'; ws.getRow(9).getCell(5).value = 'Bob';   ws.getRow(9).getCell(6).value = '2026-05-10'; ws.getRow(9).getCell(7).value = 1;
+    ws.getRow(10).getCell(4).value = '201'; ws.getRow(10).getCell(5).value = 'Cara'; ws.getRow(10).getCell(6).value = '2026-05-10'; ws.getRow(10).getCell(7).value = 3;
+    ws.getRow(11).getCell(4).value = '202'; ws.getRow(11).getCell(5).value = 'Dan';  ws.getRow(11).getCell(6).value = '2026-05-10'; ws.getRow(11).getCell(7).value = 1;
+    ws.getRow(15).getCell(6).value = 'TOTAL';
+    return { wb, ws };
+  }
+
+  const { wb, ws } = buildSheet();
+  const layout = {
+    headerRow: 6, firstBooking: 7, lastBooking: 14, totalRow: 15, totalMarkerCol: 6,
+    layout: { room: 4, guest: 5, departure: 6, adults: 7, child: 8 },
+  };
+  const sheetMeta = new Map();
+  sheetMeta.set('01', {
+    boats: [
+      { id: 'b-1', name: 'SHADHA', capacity: 10 },
+      { id: 'b-2', name: 'BAAZ',   capacity: 10 },
+    ],
+    assignments: {
+      '101|Alice|2026-05-10': 'b-1',
+      '202|Dan|2026-05-10':   'b-1',
+      '102|Bob|2026-05-10':   'b-2',
+      '201|Cara|2026-05-10':  'b-2',
+    },
+  });
+  const fileEntry = {
+    name: '01 - Sunset Dolphin Cruise May.xlsx',
+    excursionName: 'Sunset Dolphin Cruise',
+    sheets: [{ sheetName: '01', ws, layout }],
+    sheetMeta,
+    __multiBoat: true,
+    dirty: false,
+  };
+
+  await ctx.rebuildBoatGroupings(fileEntry);
+
+  // Row 7: separator for SHADHA (BOAT 1)
+  assert.strictEqual(ctx.cellStr(ws.getRow(7).getCell(5)), 'SHADHA');
+  assert.strictEqual(ctx.cellStr(ws.getRow(7).getCell(6)), 'BOAT 1');
+  // Rows 8-9: Alice + Dan in some stable order
+  const r8name = ctx.cellStr(ws.getRow(8).getCell(5));
+  const r9name = ctx.cellStr(ws.getRow(9).getCell(5));
+  assert.ok([r8name, r9name].sort().join(',') === 'Alice,Dan', `BOAT 1 group should be Alice+Dan, got ${r8name}+${r9name}`);
+  // Row 10: separator for BAAZ
+  assert.strictEqual(ctx.cellStr(ws.getRow(10).getCell(5)), 'BAAZ');
+  assert.strictEqual(ctx.cellStr(ws.getRow(10).getCell(6)), 'BOAT 2');
+  // Rows 11-12: Bob + Cara
+  const r11name = ctx.cellStr(ws.getRow(11).getCell(5));
+  const r12name = ctx.cellStr(ws.getRow(12).getCell(5));
+  assert.ok([r11name, r12name].sort().join(',') === 'Bob,Cara', `BOAT 2 group should be Bob+Cara, got ${r11name}+${r12name}`);
+
+  // Deterministic: second run produces same layout.
+  const { wb: wb2, ws: ws2 } = buildSheet();
+  const fileEntry2 = { ...fileEntry, sheets: [{ sheetName: '01', ws: ws2, layout: { ...layout, layout: layout.layout } }] };
+  await ctx.rebuildBoatGroupings(fileEntry2);
+  for (let r = 7; r <= 12; r++) {
+    for (let c = 4; c <= 7; c++) {
+      const v1 = String(ctx.cellRaw(ws.getRow(r).getCell(c)) ?? '');
+      const v2 = String(ctx.cellRaw(ws2.getRow(r).getCell(c)) ?? '');
+      assert.strictEqual(v1, v2, `row ${r} col ${c}: run-to-run mismatch (${v1} vs ${v2})`);
+    }
+  }
+  console.log('  · rebuildBoatGroupings emits ordered separators + deterministic across runs');
+}
+
+async function runMultiBoatTests() {
+  console.log('\n=== Multi-boat helpers ===');
+  console.log('A. Extracting boat helpers from Booking engine v5.html');
+  const ctx = loadBoatHelpers();
+  // Re-expose cellStr/cellRaw out of the sandbox for assertions in our tests.
+  ctx.cellStr = ctx.cellStr || vm.runInContext('cellStr', ctx);
+  ctx.cellRaw = ctx.cellRaw || vm.runInContext('cellRaw', ctx);
+  console.log('B. inferBoatsFromSheet on a synthesised Sunset-Dolphin sheet');
+  await testBoatInference(ctx);
+  console.log('C. ensureCapacity preserves style + rewrites simple SUM, leaves non-standard alone');
+  await testEnsureCapacity(ctx);
+  console.log('D. validateAssignments flags unknown boatIds');
+  await testValidateAssignments(ctx);
+  console.log('E. rebuildBoatGroupings groups rows + deterministic');
+  await testRebuildBoatGroupings(ctx);
+  console.log('  All multi-boat assertions passed.');
+}
+
+main()
+  .then(runMultiBoatTests)
+  .catch(e => {
+    console.error('\nTEST FAILED:', e && e.stack ? e.stack : e);
+    process.exit(1);
+  });
