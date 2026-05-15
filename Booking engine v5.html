@@ -317,6 +317,10 @@ background: var(--muted-2);
 .date-pill.is-active .dow { color: rgba(255, 255, 255, .82); }
 .date-pill.is-active .day { color: white; }
 .date-pill.is-active .has-data { background: rgba(255, 255, 255, .85); }
+.date-pill.is-complete:not(.is-active) { background: rgba(79, 166, 122, 0.08); }
+.date-pill.is-complete .has-data { background: var(--rd-success); }
+.date-pill.is-cancelled-day:not(.is-active) { background: rgba(196, 83, 60, 0.08); }
+.date-pill.is-cancelled-day .has-data { background: var(--rd-danger); }
 .date-pill.month-divider { padding-left: 18px; }
 .date-pill.month-divider::before {
 content: attr(data-month);
@@ -1042,6 +1046,18 @@ animation: spin .6s linear infinite;
 .activity-cancelled-banner .acb-main { flex: 1; min-width: 200px; }
 .activity-cancelled-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
+/* Day-complete banner on excursion card */
+.exc-card.is-day-complete { border-color: rgba(79, 166, 122, 0.5); }
+.day-complete-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px;
+  background: rgba(79, 166, 122, 0.12);
+  border-bottom: 1px solid rgba(79, 166, 122, 0.35);
+  color: var(--rd-success); font-size: 13px; flex-wrap: wrap;
+}
+.day-complete-banner .acb-main { flex: 1; min-width: 200px; }
+.day-complete-banner .acb-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
 /* Multi-user sync banners on excursion cards */
 .sync-banner {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1765,7 +1781,7 @@ const META_SHEET_SHEET   = '_SheetMeta';
 const META_SHEET_NAMES   = [META_BOOKING_SHEET, META_SHEET_SHEET];
 
 const BOOKING_META_COLS = ['sheetName','rowIdx','status','cancelReason','cancelledAt','postponedTo','postponedRef','attended','paid','paidAt'];
-const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity'];
+const SHEET_META_COLS   = ['sheetName','activityCancelled','cancelReasonCat','cancelReasonNote','guestsInformed','cancelledAt','customCapacity','completed','completedAt','completedBy'];
 
 const BOOKING_META_DEFAULTS = {
   status: 'active', cancelReason: '', cancelledAt: '',
@@ -1775,6 +1791,7 @@ const BOOKING_META_DEFAULTS = {
 const SHEET_META_DEFAULTS = {
   activityCancelled: false, cancelReasonCat: '', cancelReasonNote: '',
   guestsInformed: false, cancelledAt: '', customCapacity: null,
+  completed: false, completedAt: '', completedBy: '',
 };
 
 function nowISO() { return new Date().toISOString(); }
@@ -1832,7 +1849,7 @@ function readMetaSheets(wb) {
         if (col === 'sheetName' || headers[col] == null) continue;
         const v = cellRaw(row.getCell(headers[col]));
         if (v == null || v === '') continue;
-        if (col === 'activityCancelled' || col === 'guestsInformed') obj[col] = asBool(v);
+        if (col === 'activityCancelled' || col === 'guestsInformed' || col === 'completed') obj[col] = asBool(v);
         else if (col === 'customCapacity') { const n = Number(v); obj[col] = isNaN(n) ? null : n; }
         else obj[col] = String(v);
       }
@@ -3239,6 +3256,16 @@ function renderDateStrip() {
     const isActive = d === STATE.selectedDate;
     const isToday = d === today;
 
+    // Day-level rollup: complete only if every non-cancelled sheet for this date is marked completed.
+    // is-cancelled-day wins over is-complete in the precedence rule.
+    const sheetsForDate = [];
+    for (const f of STATE.files) for (const s of f.sheets) {
+      if (s.layout.dateISO === d) sheetsForDate.push({f, s});
+    }
+    const activeSheets = sheetsForDate.filter(({f, s}) => !getSheetMeta(f, s.sheetName).activityCancelled);
+    const isComplete = activeSheets.length > 0 && activeSheets.every(({f, s}) => getSheetMeta(f, s.sheetName).completed);
+    const isAllCancelled = sheetsForDate.length > 0 && sheetsForDate.every(({f, s}) => getSheetMeta(f, s.sheetName).activityCancelled);
+
     const [Y,M,D] = d.split('-').map(Number);
     const dt = new Date(Y, M-1, D);
     const dow = dt.toLocaleDateString(undefined, {weekday:'short'}).slice(0,3);
@@ -3247,6 +3274,7 @@ function renderDateStrip() {
       class: 'date-pill' +
         (isActive ? ' is-active' : '') +
         (isToday ? ' is-today' : '') +
+        (isAllCancelled ? ' is-cancelled-day' : (isComplete ? ' is-complete' : '')) +
         (isMonthStart ? ' month-divider' : ''),
       'data-date': d,
       ...(isMonthStart ? {'data-month': fmtMonth(d)} : {}),
@@ -3379,7 +3407,12 @@ function renderExcursionCard(file, sheet) {
   const pct = cap ? Math.min(100, (filled/cap)*100) : 0;
   const status = filled >= cap ? 'is-full' : (cap && filled >= cap * 0.85) ? 'is-warn' : '';
 
-  const card = el('div', {class: 'exc-card' + (sheetMeta.activityCancelled ? ' is-day-cancelled' : ''), style: {'--exc-color': file.excursionColor}});
+  const card = el('div', {
+    class: 'exc-card'
+      + (sheetMeta.activityCancelled ? ' is-day-cancelled' : '')
+      + (sheetMeta.completed ? ' is-day-complete' : ''),
+    style: {'--exc-color': file.excursionColor},
+  });
 
   // Activity-cancelled banner (top)
   if (sheetMeta.activityCancelled) {
@@ -3402,6 +3435,26 @@ function renderExcursionCard(file, sheet) {
       )
     );
     card.append(banner);
+  }
+
+  // Day-complete banner (mutually exclusive with activity-cancelled)
+  if (sheetMeta.completed && !sheetMeta.activityCancelled) {
+    const when = sheetMeta.completedAt ? new Date(sheetMeta.completedAt).toLocaleString() : '';
+    card.append(el('div', {class: 'day-complete-banner'},
+      el('div', {class:'acb-main'},
+        el('strong', {}, 'DAY COMPLETE'),
+        ' · closed by ', sheetMeta.completedBy || 'unknown',
+        when ? ` · ${when}` : '',
+      ),
+      el('div', {class:'acb-side'},
+        el('button', {class:'btn btn-small', onclick: () => {
+          if (!confirm('Re-open this day for edits?')) return;
+          setSheetMeta(file, sheet.sheetName, {completed: false, completedAt: '', completedBy: ''});
+          rebuildBookings(); updateStatus();
+          toast('Day re-opened', 'success'); renderDateStrip(); renderView();
+        }}, 'Re-open'),
+      ),
+    ));
   }
 
   // Sync awareness banners (peer lock + remote-changed-while-dirty)
@@ -3501,7 +3554,20 @@ function renderExcursionCard(file, sheet) {
     ),
     el('div', {style:{flex:1}}),
   );
-  if (!sheetMeta.activityCancelled) {
+  if (!sheetMeta.activityCancelled && !sheetMeta.completed) {
+    footer.append(el('button', {
+      class: 'btn',
+      title: 'Mark this excursion as departed and closed for the day',
+      onclick: () => {
+        setSheetMeta(file, sheet.sheetName, {
+          completed: true,
+          completedAt: nowISO(),
+          completedBy: STATE.userId || 'unknown',
+        });
+        rebuildBookings(); updateStatus();
+        toast('Day marked complete', 'success'); renderDateStrip(); renderView();
+      },
+    }, 'Mark day complete'));
     footer.append(el('button', {
       class: 'btn btn-link-danger',
       onclick: () => openActivityCancelModal(file, sheet),
@@ -4122,6 +4188,16 @@ function openAddModal(prefill = {}) {
 
 function openEditModal(b) {
   const file = STATE.files.find(f => f.name === b.fileKey);
+  const sheetMeta = file ? getSheetMeta(file, b.sheetName) : {};
+  const dayClosedBanner = sheetMeta.completed
+    ? el('div', {class: 'status-banner is-postponed', style: {display: ''}},
+        el('div', {},
+          el('strong', {}, 'DAY CLOSED'),
+          ' · this excursion was marked complete',
+          sheetMeta.completedBy ? ` by ${sheetMeta.completedBy}` : '',
+          '. Edits are still possible but other operators may not expect them.'),
+      )
+    : null;
 
   const room = el('input', {type:'text', value: b.room || ''});
   const guest = el('input', {type:'text', value: b.guest || ''});
@@ -4360,6 +4436,7 @@ function openEditModal(b) {
       el('span', {}, b.excursionName, ' · ', fmtDateLong(b.dateISO), ' · slot ', String(b.slot ?? '?'))
     ),
     statusBanner,
+    dayClosedBanner,
     el('div', {class:'modal-legend'}, el('span', {class:'req'}, '•'), ' marks required fields.'),
     el('div', {class:'body'},
       el('div', {class:'form-section'}, 'Booking'),
