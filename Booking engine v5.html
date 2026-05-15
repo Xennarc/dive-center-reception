@@ -995,6 +995,20 @@ animation: spin .6s linear infinite;
 .show-cancelled-toggle:hover { color: var(--ink); border-color: var(--border-strong); }
 .show-cancelled-toggle.is-on { background: var(--card); color: var(--ink); border-color: var(--border-strong); }
 
+.filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 14px; }
+.filter-chip {
+  padding: 4px 12px; border-radius: 999px; font-size: 12px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.filter-chip:hover { color: var(--ink); border-color: var(--border-strong); }
+.filter-chip.is-on { background: var(--primary); color: white; border-color: var(--primary); }
+.outstanding-badge {
+  align-self: center;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(224, 163, 60, 0.18); color: var(--rd-warning);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+
 /* Status pills inside the bookings table */
 .col-status { width: 110px; }
 .pill {
@@ -1229,6 +1243,7 @@ animation: spin .6s linear infinite;
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
+      <span id="outstanding-badge" class="outstanding-badge" style="display:none" title="Active bookings on the selected date that are unpaid or marked no-show"></span>
       <div class="spacer" style="flex:1"></div>
       <button id="btn-inhouse" class="btn btn-with-badge" title="Manage inhouse reports">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
@@ -1285,6 +1300,8 @@ const STATE = {
   search: '',
   selectedDate: null,        // ISO
   showCancelled: false,      // toggle: include cancelled/postponed in agenda lists
+  searchFilter: 'all',       // status filter chip on search results (session-only)
+  agendaFilter: 'all',       // status filter chip on agenda cards (session-only)
   inhouseGuests: [],         // [{room, name, arrival, departure, property, businessDate, sourceFile}]
   inhouseReports: [],        // [{filename, property, businessDate, guestCount, error?}]
   userId: null,              // operator name; persisted at localStorage['reefdesk:userId']
@@ -3115,6 +3132,20 @@ function updateStatus(){
     txt.textContent = `${STATE.files.length} file${STATE.files.length>1?'s':''}`;
   }
   $('#btn-save').disabled = !dirty;
+  updateOutstandingBadge();
+}
+
+function updateOutstandingBadge() {
+  const node = $('#outstanding-badge');
+  if (!node) return;
+  const d = STATE.selectedDate;
+  if (!d) { node.style.display = 'none'; return; }
+  const day = STATE.bookings.filter(b => b.dateISO === d && (b.status === 'active' || !b.status));
+  const unpaid = day.filter(b => b.paid !== 'yes' && b.paid !== 'comp').length;
+  const noshow = day.filter(b => b.attended === 'no').length;
+  if (!unpaid && !noshow) { node.style.display = 'none'; return; }
+  node.textContent = `${unpaid} unpaid · ${noshow} no-show`;
+  node.style.display = '';
 }
 
 function updateSavingIndicator(){
@@ -3178,6 +3209,7 @@ function renderDateStrip() {
 function renderView() {
   const c = $('#view-container');
   c.innerHTML = '';
+  updateOutstandingBadge();
   // Search overrides everything
   if (STATE.search.trim()) { c.append(renderSearchResults()); return; }
   if (STATE.view === 'people') { c.append(renderPeople()); return; }
@@ -3260,6 +3292,8 @@ function renderAgenda() {
     return wrap;
   }
 
+  wrap.append(renderStatusFilterChips('agendaFilter', () => renderView()));
+
   const agenda = el('div', {class:'agenda'});
   for (const {file, sheet} of sheets) {
     agenda.append(renderExcursionCard(file, sheet));
@@ -3332,7 +3366,10 @@ function renderExcursionCard(file, sheet) {
 
   // Decide which bookings to show
   const showCancelled = STATE.showCancelled;
-  const visibleBookings = showCancelled ? allBookings : activeBookings;
+  const visibleBookings = applyStatusFilter(
+    showCancelled ? allBookings : activeBookings,
+    STATE.agendaFilter
+  );
 
   if (visibleBookings.length === 0) {
     card.append(el('div', {class:'empty-card-body'},
@@ -3615,6 +3652,27 @@ function openGuestDetail(name, list) {
   openModal(node);
 }
 
+const STATUS_FILTERS = [
+  {key:'all',       label:'All',          test: () => true},
+  {key:'active',    label:'Active',       test: b => (b.status === 'active' || !b.status)},
+  {key:'cancelled', label:'Cancelled',    test: b => b.status === 'cancelled'},
+  {key:'postponed', label:'Postponed',    test: b => b.status === 'postponed'},
+  {key:'unpaid',    label:'Pending paid', test: b => (b.status === 'active' || !b.status) && b.paid !== 'yes' && b.paid !== 'comp'},
+  {key:'noshow',    label:'No-shows',     test: b => b.attended === 'no'},
+];
+function applyStatusFilter(list, key) {
+  const f = STATUS_FILTERS.find(x => x.key === key) || STATUS_FILTERS[0];
+  return list.filter(f.test);
+}
+function renderStatusFilterChips(stateKey, onChange) {
+  return el('div', {class:'filter-chips'},
+    ...STATUS_FILTERS.map(f => el('button', {
+      class: 'filter-chip' + (STATE[stateKey] === f.key ? ' is-on' : ''),
+      onclick: () => { STATE[stateKey] = f.key; onChange(); },
+    }, f.label))
+  );
+}
+
 /* ============================================================
    Search results (across all dates / guests)
    ============================================================ */
@@ -3626,6 +3684,7 @@ function renderSearchResults() {
     const hay = [b.guest, b.room, b.remarks, b.staff, b.billNo, b.liability].join(' ').toLowerCase();
     return hay.includes(q);
   });
+  list = applyStatusFilter(list, STATE.searchFilter);
   list.sort((a,b)=> (a.dateISO||'').localeCompare(b.dateISO||'') || a.excursionName.localeCompare(b.excursionName));
 
   const heading = el('div', {class:'day-heading'},
@@ -3633,6 +3692,7 @@ function renderSearchResults() {
     el('div', {class:'day-summary'}, `for "${STATE.search}"`)
   );
   wrap.append(heading);
+  wrap.append(renderStatusFilterChips('searchFilter', () => renderView()));
 
   if (!list.length) {
     wrap.append(makeEmpty("Nothing's biting. Try another search.", 'Try a different name, room number, or bill number.'));
