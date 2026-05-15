@@ -2304,19 +2304,20 @@ async function loadFiles(fileSpecs){
       const sheets = [];
       const declared = getLayoutFor(spec.name);
       const excKey = excursionKeyFor(spec.name);
-      let layoutWarned = false;
       wb.eachSheet((ws) => {
         if (META_SHEET_NAMES.includes(ws.name)) return;
         const lay = detectLayout(ws);
         if (!lay) return;
-        // Soft layout self-check against the declared registry.
-        if (declared && !layoutWarned) {
+        // Diagnostic only: log per-sheet drift against the declared
+        // registry. Templates legitimately drift sheet-to-sheet (HR
+        // Snorkeling sheet '8' shifts cols right by one; Korean HRO
+        // sheet '13' has a stray '3' where 'Staff' belongs) and
+        // detectLayout() already handles the drift at runtime — every
+        // read/write path uses lay.layout, not the declared map. No
+        // user-facing surface for this; check DevTools to diagnose.
+        if (declared) {
           const mismatches = verifyLayoutAgainstSheet(declared, ws);
-          if (mismatches.length) {
-            console.warn('Layout mismatch in', spec.name, ws.name, mismatches);
-            toast(`${spec.name}: header columns don't match registry — saves may be unreliable`, 'error');
-            layoutWarned = true;
-          }
+          if (mismatches.length) console.warn('Layout drift in', spec.name, ws.name, mismatches);
         }
         sheets.push({ sheetName: ws.name, ws, layout: lay });
       });
@@ -2838,6 +2839,13 @@ async function rebuildBoatGroupings(fileEntry) {
     const meta = getSheetMeta(fileEntry, s.sheetName);
     const boats = meta.boats || [];
     if (boats.length === 0) continue; // Day has no boats — leave as-is.
+    // Detection must have found at least the cols the separator rows
+    // write (room/guest/departure). If not, the sheet's headers drifted
+    // far enough that we can't safely re-emit it — refuse to save rather
+    // than write to undefined columns.
+    if (!lay.layout || !lay.layout.room || !lay.layout.guest || !lay.layout.departure) {
+      throw new Error(`${fileEntry.name} ${s.sheetName}: header detection missing room/guest/departure — can't safely save`);
+    }
     const validationErrors = validateAssignments(meta);
     if (validationErrors.length) {
       throw new Error(`${fileEntry.name} ${s.sheetName}: ${validationErrors.length} bad boat assignment(s) — fix before saving`);
